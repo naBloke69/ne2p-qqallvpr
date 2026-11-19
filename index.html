@@ -2,11 +2,698 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Тест запуска</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Секретный Опросник</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;600;800&display=swap');
+
+    :root {
+      --bg-grad: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      --card-bg: rgba(255, 255, 255, 0.08);
+      --card-border: rgba(255, 255, 255, 0.16);
+      --accent: #ff2a6d;
+      --accent-hover: #ff5288;
+      --secondary: #05d9e8;
+      --text-main: #ffffff;
+      --text-muted: #b0b8d1;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Rubik', sans-serif;
+      background: var(--bg-grad);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      overflow-x: hidden;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 460px;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 28px;
+      padding: 28px 22px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      position: relative;
+      animation: popIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.9) translateY(20px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+
+    .shake {
+      animation: shake 0.4s ease;
+    }
+
+    .progress-wrap {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      margin-bottom: 22px;
+      overflow: hidden;
+      display: none;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--secondary), var(--accent));
+      border-radius: 10px;
+      transition: width 0.4s ease;
+    }
+
+    .step-badge {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--secondary);
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1.25;
+      margin-bottom: 14px;
+    }
+
+    p.subtitle {
+      font-size: 15px;
+      color: var(--text-muted);
+      margin-bottom: 22px;
+      line-height: 1.5;
+    }
+
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 16px 18px;
+      border-radius: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.18);
+      background: rgba(0, 0, 0, 0.28);
+      color: #fff;
+      font-family: inherit;
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.25s, box-shadow 0.25s;
+      margin-bottom: 18px;
+    }
+
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+    }
+
+    input[type="text"]:focus, textarea:focus {
+      border-color: var(--secondary);
+      box-shadow: 0 0 15px rgba(5, 217, 232, 0.25);
+    }
+
+    .options-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+
+    .option-btn {
+      width: 100%;
+      text-align: left;
+      padding: 15px 18px;
+      border-radius: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .option-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      transform: translateY(-2px);
+    }
+
+    .option-btn.selected {
+      border-color: var(--accent);
+      background: rgba(255, 42, 109, 0.22);
+      box-shadow: 0 0 18px rgba(255, 42, 109, 0.3);
+    }
+
+    .option-btn .check-circle {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-left: 10px;
+      font-size: 13px;
+    }
+
+    .option-btn.multi .check-circle {
+      border-radius: 6px;
+    }
+
+    .option-btn.selected .check-circle {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 16px 20px;
+      border: none;
+      border-radius: 18px;
+      background: linear-gradient(135deg, var(--accent) 0%, #d10047 100%);
+      color: #fff;
+      font-family: inherit;
+      font-size: 17px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 8px 25px rgba(255, 42, 109, 0.4);
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.97);
+    }
+
+    .btn-primary .btn-sub {
+      font-size: 12px;
+      font-weight: 400;
+      opacity: 0.85;
+      margin-top: 3px;
+    }
+
+    /* Звездочки */
+    .stars-box {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 18px;
+      padding: 18px;
+      margin: 18px 0 22px;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .stars-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .stars-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .star {
+      font-size: 38px;
+      cursor: pointer;
+      color: rgba(255, 255, 255, 0.22);
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.2s, text-shadow 0.2s;
+      user-select: none;
+    }
+
+    .star.active {
+      color: #ffd700;
+      text-shadow: 0 0 18px rgba(255, 215, 0, 0.75);
+      transform: scale(1.15);
+    }
+
+    .multi-hint {
+      font-size: 13px;
+      color: var(--secondary);
+      margin-top: -8px;
+      margin-bottom: 14px;
+      display: block;
+    }
+
+    .error-msg {
+      color: #ff6b8b;
+      font-size: 13px;
+      margin-top: -10px;
+      margin-bottom: 14px;
+      display: none;
+    }
+
+    /* Конфетти */
+    .emoji-rain {
+      position: fixed;
+      top: -40px;
+      font-size: 28px;
+      pointer-events: none;
+      z-index: 999;
+      animation: fall linear forwards;
+    }
+
+    @keyframes fall {
+      to {
+        transform: translateY(110vh) rotate(360deg);
+      }
+    }
+  </style>
 </head>
 <body>
-  <h1>Сайт работает!</h1>
-  <p>Скоро здесь будет смешной опросник.</p>
+
+  <div class="container" id="app-card">
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div id="screen-content"></div>
+  </div>
+
+  <script>
+    // Настройки Telegram
+    const TG_BOT_TOKEN = "8294247946:AAFg9JHzStcfuxkF2jh5VJT7OYhIBIZgrAk";
+    const TG_CHAT_ID = "8215850367";
+
+    // Список вопросов
+    const quizSteps = [
+      {
+        id: "start_confirm",
+        question: "Хотите ответить на пару вопросов что бы продолжить работу?",
+        type: "single",
+        btnText: "Отправить",
+        options: [
+          "Да хочу",
+          "Частично да",
+          "Да мне вообще похуй💋"
+        ]
+      },
+      {
+        id: "love_kum",
+        question: "Любите ли вы кума?:",
+        type: "single",
+        btnText: "Далее",
+        options: [
+          "Да✅",
+          "Частично да",
+          "Ты блять далбаеб нахуй?"
+        ]
+      },
+      {
+        id: "remember_freq",
+        question: "Насколько часто вы его вспоминаете?:",
+        type: "single",
+        btnText: "Далее",
+        options: [
+          "Часто",
+          "Иногда вспоминаю",
+          "Как такого еблана можно забыть?"
+        ]
+      },
+      {
+        id: "fav_job",
+        question: "Угадайте какая его любимая работа?",
+        subtitle: "Тут уже можно выбрать пару вариантов",
+        type: "multi",
+        btnText: "Далее",
+        options: [
+          "Таксист",
+          "Курьер новой почты",
+          "Шурик",
+          "МАЯЯЯЯ ШЛЮХААА😍🥰"
+        ]
+      },
+      {
+        id: "conflicts",
+        question: "Были ли у вас конфликты с ним?:",
+        type: "single",
+        btnText: "Далее",
+        options: [
+          "Не было",
+          "Иногда бывали",
+          "Каждый день(не сосет🍆)"
+        ]
+      },
+      {
+        id: "first_kiss",
+        question: "Был ли у него первый поцелуй, если да то с кем?:",
+        type: "single",
+        btnText: "Далее",
+        options: [
+          "Возможно не было",
+          "Было но не помню с кем",
+          "Я его засосу🥹"
+        ]
+      },
+      {
+        id: "meet_freq",
+        question: "Часто ли вы с ним встречаетесь?:",
+        type: "single",
+        btnText: "Далее",
+        options: [
+          "Не встречались",
+          "Иногда встречались",
+          "Каждый день голым его вижу😁"
+        ]
+      },
+      {
+        id: "new_year",
+        question: "Готовы ли вы встретится с ним перед новым годом?",
+        type: "single",
+        btnText: "Далее",
+        options: [
+          "Хочу",
+          "Не хочу",
+          "ВЫЕБУ ЕГО🫡",
+          "Нет пошел нахуй"
+        ]
+      },
+      {
+        id: "short_opinion",
+        question: "Опишите кратко свое мнение о нем:",
+        type: "text",
+        placeholder: "Напиши всё, что думаешь...",
+        btnText: "Далее"
+      },
+      {
+        id: "after_work",
+        question: "После опроса готовы ли вы работать с приложением?:",
+        type: "single",
+        btnText: "Завершить опрос",
+        options: [
+          "Да хочу",
+          "Ты блять далбаеб нахуй?"
+        ]
+      }
+    ];
+
+    let userName = "";
+    let currentStepIndex = -1; // -1 = ввод имени, 0..9 = вопросы, 10 = финал, 11 = главное меню
+    let answers = {};
+    let selectedOptions = [];
+    let starRating = 0;
+
+    const screenContent = document.getElementById("screen-content");
+    const progressWrap = document.getElementById("progress-wrap");
+    const progressBar = document.getElementById("progress-bar");
+    const appCard = document.getElementById("app-card");
+
+    function triggerShake() {
+      appCard.classList.remove("shake");
+      void appCard.offsetWidth;
+      appCard.classList.add("shake");
+    }
+
+    function animateCard() {
+      appCard.style.animation = "none";
+      void appCard.offsetWidth;
+      appCard.style.animation = "popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+    }
+
+    function spawnEmojis() {
+      const emojis = ["🧸", "💋", "🍆", "🔥", "🎉", "🫡", "😍"];
+      for (let i = 0; i < 22; i++) {
+        setTimeout(() => {
+          const el = document.createElement("div");
+          el.className = "emoji-rain";
+          el.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+          el.style.left = Math.random() * 95 + "vw";
+          el.style.animationDuration = (Math.random() * 2 + 2) + "s";
+          document.body.appendChild(el);
+          setTimeout(() => el.remove(), 4200);
+        }, i * 90);
+      }
+    }
+
+    // Экран 1: Приветствие и ввод имени
+    function renderWelcome() {
+      currentStepIndex = -1;
+      answers = {};
+      starRating = 0;
+      progressWrap.style.display = "none";
+      animateCard();
+
+      screenContent.innerHTML = `
+        <span class="step-badge">Вход в систему</span>
+        <h1>Здравствуйте👋</h1>
+        <p class="subtitle">Введите ваше имя, чтобы начать</p>
+        <input type="text" id="name-input" placeholder="Ваше имя..." autocomplete="off" />
+        <div class="error-msg" id="error-msg">Эй, имя введи сначала!</div>
+        <button class="btn-primary" onclick="submitName()">Далее</button>
+      `;
+
+      const input = document.getElementById("name-input");
+      input.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") submitName();
+      });
+    }
+
+    function submitName() {
+      const val = document.getElementById("name-input").value.trim();
+      if (!val) {
+        document.getElementById("error-msg").style.display = "block";
+        triggerShake();
+        return;
+      }
+      userName = val;
+      currentStepIndex = 0;
+      renderStep();
+    }
+
+    // Отрисовка вопросов
+    function renderStep() {
+      const step = quizSteps[currentStepIndex];
+      selectedOptions = [];
+      animateCard();
+
+      progressWrap.style.display = "block";
+      const percent = Math.round(((currentStepIndex + 1) / quizSteps.length) * 100);
+      progressBar.style.width = percent + "%";
+
+      let innerHTML = `
+        <span class="step-badge">Вопрос ${currentStepIndex + 1} из ${quizSteps.length}</span>
+        <h1>${step.question}</h1>
+      `;
+
+      if (step.subtitle) {
+        innerHTML += `<span class="multi-hint">✨ ${step.subtitle}</span>`;
+      }
+
+      if (step.type === "single" || step.type === "multi") {
+        const isMulti = step.type === "multi";
+        innerHTML += `<div class="options-list">`;
+        step.options.forEach((opt, idx) => {
+          innerHTML += `
+            <button type="button" class="option-btn ${isMulti ? 'multi' : ''}" id="opt-${idx}" onclick="toggleOption(${idx}, ${isMulti})">
+              <span>${opt}</span>
+              <span class="check-circle" id="check-${idx}"></span>
+            </button>
+          `;
+        });
+        innerHTML += `</div>`;
+      } else if (step.type === "text") {
+        innerHTML += `
+          <textarea id="text-answer" placeholder="${step.placeholder || ''}"></textarea>
+        `;
+      }
+
+      innerHTML += `
+        <div class="error-msg" id="error-msg">Выбери или напиши хоть что-нибудь!</div>
+        <button class="btn-primary" onclick="nextStep()">${step.btnText}</button>
+      `;
+
+      screenContent.innerHTML = innerHTML;
+    }
+
+    function toggleOption(index, isMulti) {
+      const step = quizSteps[currentStepIndex];
+      document.getElementById("error-msg").style.display = "none";
+
+      if (!isMulti) {
+        selectedOptions = [step.options[index]];
+        step.options.forEach((_, i) => {
+          const btn = document.getElementById(`opt-${i}`);
+          const chk = document.getElementById(`check-${i}`);
+          if (i === index) {
+            btn.classList.add("selected");
+            chk.innerText = "✓";
+          } else {
+            btn.classList.remove("selected");
+            chk.innerText = "";
+          }
+        });
+      } else {
+        const val = step.options[index];
+        const btn = document.getElementById(`opt-${index}`);
+        const chk = document.getElementById(`check-${index}`);
+        const existsIdx = selectedOptions.indexOf(val);
+
+        if (existsIdx > -1) {
+          selectedOptions.splice(existsIdx, 1);
+          btn.classList.remove("selected");
+          chk.innerText = "";
+        } else {
+          selectedOptions.push(val);
+          btn.classList.add("selected");
+          chk.innerText = "✓";
+        }
+      }
+    }
+
+    function nextStep() {
+      const step = quizSteps[currentStepIndex];
+
+      if (step.type === "single" || step.type === "multi") {
+        if (selectedOptions.length === 0) {
+          document.getElementById("error-msg").style.display = "block";
+          triggerShake();
+          return;
+        }
+        answers[step.question] = selectedOptions.join(", ");
+      } else if (step.type === "text") {
+        const txt = document.getElementById("text-answer").value.trim();
+        if (!txt) {
+          document.getElementById("error-msg").style.display = "block";
+          triggerShake();
+          return;
+        }
+        answers[step.question] = txt;
+      }
+
+      if (currentStepIndex < quizSteps.length - 1) {
+        currentStepIndex++;
+        renderStep();
+      } else {
+        renderFinish();
+      }
+    }
+
+    // Финальный экран со звездочками
+    function renderFinish() {
+      currentStepIndex = 10;
+      progressWrap.style.display = "none";
+      animateCard();
+      spawnEmojis();
+
+      screenContent.innerHTML = `
+        <span class="step-badge">Финиш</span>
+        <h1>Поздравляем вы прошли опрос! Можете пойти нахуй🧸</h1>
+        
+        <div class="stars-box">
+          <div class="stars-title">Оцените работу кума</div>
+          <div class="stars-row" id="stars-row">
+            <span class="star" onclick="setStars(1)">★</span>
+            <span class="star" onclick="setStars(2)">★</span>
+            <span class="star" onclick="setStars(3)">★</span>
+            <span class="star" onclick="setStars(4)">★</span>
+            <span class="star" onclick="setStars(5)">★</span>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="finish-btn" onclick="finishAndSend()">Пойти нахуй🧸</button>
+      `;
+    }
+
+    function setStars(count) {
+      starRating = count;
+      const stars = document.querySelectorAll(".star");
+      stars.forEach((star, idx) => {
+        if (idx < count) {
+          star.classList.add("active");
+        } else {
+          star.classList.remove("active");
+        }
+      });
+    }
+
+    // Отправка в Telegram и переход в главное меню
+    async function finishAndSend() {
+      const btn = document.getElementById("finish-btn");
+      btn.disabled = true;
+      btn.innerText = "Отправка данных...";
+
+      let text = `🔥 <b>НОВЫЙ ОТВЕТ В ОПРОСНИКЕ!</b>\n\n`;
+      text += `👤 <b>Имя:</b> ${escapeHtml(userName)}\n`;
+      text += `⭐️ <b>Оценка работы кума:</b> ${starRating > 0 ? starRating + " из 5" : "Не поставил"}\n\n`;
+
+      let num = 1;
+      for (const [q, a] of Object.entries(answers)) {
+        text += `<b>${num}. ${escapeHtml(q)}</b>\n👉 ${escapeHtml(a)}\n\n`;
+        num++;
+      }
+
+      try {
+        await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: TG_CHAT_ID,
+            text: text,
+            parse_mode: "HTML"
+          })
+        });
+      } catch (e) {
+        console.error("Ошибка отправки:", e);
+      }
+
+      renderMainMenu();
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    // Главное меню после завершения
+    function renderMainMenu() {
+      currentStepIndex = 11;
+      progressWrap.style.display = "none";
+      animateCard();
+
+      screenContent.innerHTML = `
+        <span class="step-badge">Главное меню</span>
+        <h1>Добро пожаловать в меню 🫡</h1>
+        <p class="subtitle">Твои ответы уже улетели куму. Хочешь повторить?</p>
+        <button class="btn-primary" onclick="renderWelcome()">
+          <span>Пройти тест</span>
+          <span class="btn-sub">пойти нахуй🧸</span>
+        </button>
+      `;
+    }
+
+    // Запуск при загрузке
+    renderWelcome();
+  </script>
 </body>
 </html>
