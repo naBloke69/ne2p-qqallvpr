@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>root@intrusion-shell:~#</title>
+  <title>root@shell-breach:~#</title>
   <style>
     * {
       box-sizing: border-box;
@@ -135,6 +135,14 @@
       padding: 20px;
     }
 
+    .final-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      max-width: 680px;
+    }
+
     #final-alert .alert-text {
       color: #ff2a3c;
       font-size: 27px;
@@ -142,6 +150,15 @@
       line-height: 1.35;
       text-shadow: 0 0 12px rgba(255, 42, 60, 0.55);
       animation: pulseRed 1.1s infinite alternate;
+    }
+
+    #final-alert .sub-alert-text {
+      color: #ff3b4e;
+      font-size: 12px;
+      font-weight: normal;
+      line-height: 1.45;
+      opacity: 0.92;
+      max-width: 420px;
     }
 
     @keyframes pulseRed {
@@ -156,15 +173,18 @@
 
   <div id="terminal">
     <div id="top-bar">
-      <span>● INTRUSION SHELL // TTY1 [LOCKED]</span>
-      <span id="sound-hint">TAP SCREEN FOR LOUD BEEP</span>
+      <span>● BREACH SHELL // TTY1 [LIVE]</span>
+      <span id="sound-hint">TAP SCREEN FOR BEEP</span>
     </div>
     <div id="output"></div>
     <div id="cursor-row"><span id="typing-line" class="cmd"></span><span class="cursor"></span></div>
   </div>
 
   <div id="final-alert">
-    <div class="alert-text">Доступ получен. Немедленно отключите свое устройство.</div>
+    <div class="final-box">
+      <div class="alert-text">Доступ получен. Немедленно отключите свое устройство.</div>
+      <div class="sub-alert-text">Ваши аккаунты и пароли под угрозой, не беспокойтесь все будет хорошо.</div>
+    </div>
   </div>
 
   <script>
@@ -183,8 +203,10 @@
     let finished = false;
     let audioCtx = null;
     let masterGain = null;
+    let audioUnlocked = false;
     let firstTouchSent = false;
     let hiddenSent = false;
+    let tapCounter = 0;
     const sessionStart = Date.now();
 
     const ua = navigator.userAgent;
@@ -224,43 +246,62 @@
     const deviceModel = detectDeviceModel();
     const browserName = detectBrowser();
 
-    function unlockAudio() {
+    // Чистый высокий "писк" через Web Audio API (без низкого "старого" гула)
+    function ensureAudioContext() {
       try {
         if (!audioCtx) {
           const AC = window.AudioContext || window.webkitAudioContext;
-          if (AC) {
-            audioCtx = new AC();
-            masterGain = audioCtx.createGain();
-            masterGain.gain.value = 0.85;
-            masterGain.connect(audioCtx.destination);
-          }
+          if (!AC) return null;
+          audioCtx = new AC();
+          masterGain = audioCtx.createGain();
+          masterGain.gain.setValueAtTime(0.9, audioCtx.currentTime);
+          masterGain.connect(audioCtx.destination);
         }
-        if (audioCtx && audioCtx.state === "suspended") {
+        if (audioCtx.state === "suspended") {
           audioCtx.resume().then(() => {
-            if (soundHint) soundHint.textContent = "BEEP: ARMED";
+            audioUnlocked = true;
+            if (soundHint) soundHint.textContent = "BEEP: READY";
           }).catch(() => {});
-        } else if (audioCtx && audioCtx.state === "running") {
-          if (soundHint) soundHint.textContent = "BEEP: ARMED";
+        } else if (audioCtx.state === "running") {
+          audioUnlocked = true;
+          if (soundHint) soundHint.textContent = "BEEP: READY";
         }
+        return audioCtx;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function playBeep(freq = 2450, duration = 0.06, vol = 0.85) {
+      try {
+        const ctx = ensureAudioContext();
+        if (!ctx || !masterGain || ctx.state !== "running") return;
+
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        // Чистая синусоида на высокой частоте звучит как четкий "писк", а не треск
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, now);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(vol, now + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+
+        osc.start(now);
+        osc.stop(now + duration + 0.01);
       } catch (e) {}
     }
 
-    // Громкий резкий системный писк через Web Audio API
-    function playBeep(freq = 1850, duration = 0.09, type = "square", vol = 0.75) {
-      try {
-        unlockAudio();
-        if (!audioCtx || !masterGain || audioCtx.state !== "running") return;
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-        osc.connect(gain);
-        gain.connect(masterGain);
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
-      } catch (e) {}
+    function playDoubleBeep() {
+      playBeep(2600, 0.07, 0.9);
+      setTimeout(() => {
+        if (!finished) playBeep(2950, 0.09, 0.95);
+      }, 95);
     }
 
     function triggerVibrate(pattern) {
@@ -274,8 +315,8 @@
       terminalEl.classList.remove("shake");
       void terminalEl.offsetWidth;
       terminalEl.classList.add("shake");
-      playBeep(2200, 0.14, "square", 0.9);
-      triggerVibrate([50, 30, 70]);
+      playDoubleBeep();
+      triggerVibrate([45, 30, 65]);
       setTimeout(() => flashOverlay.classList.remove("flash"), 140);
     }
 
@@ -293,11 +334,12 @@
       } catch (e) {}
     }
 
-    ["touchstart", "touchend", "pointerdown", "click", "keydown"].forEach((evt) => {
+    ["touchstart", "pointerdown", "click", "keydown"].forEach((evt) => {
       window.addEventListener(evt, (e) => {
-        unlockAudio();
-        playBeep(2100, 0.08, "square", 0.85);
+        ensureAudioContext();
+        playBeep(2500, 0.07, 0.9);
         triggerVibrate(15);
+        tapCounter++;
 
         if (!firstTouchSent) {
           firstTouchSent = true;
@@ -309,7 +351,7 @@
 ` +
             `⏱ <b>Секунда от входа:</b> ${sec} с
 ` +
-            `📍 <b>Координаты тапа:</b> X=${x}, Y=${y}
+            `📍 <b>Координаты:</b> X=${x}, Y=${y}
 ` +
             `📱 <b>Устройство:</b> ${deviceModel}`
           );
@@ -323,13 +365,15 @@
         const sec = ((Date.now() - sessionStart) / 1000).toFixed(1);
         const reachedEnd = finished ? "Да (досидел до финала)" : "Нет (ушёл до 30 сек)";
         sendTgMessage(
-          `🚪 <b>СВЕРНУЛ / УШЁЛ СО СТРАНИЦЫ!</b>
+          `🚪 <b>СВЕРНУЛ / ПОКИНУЛ ВКЛАДКУ!</b>
 ` +
           `⏱ <b>Время на странице:</b> ${sec} с
 ` +
           `🏁 <b>Дошёл до красного текста:</b> ${reachedEnd}
 ` +
-          `📱 <b>Устройство:</b> ${deviceModel}`
+          `📱 <b>Устройство:</b> ${deviceModel}
+` +
+          `🖱 <b>Всего касаний:</b> ${tapCounter}`
         );
       }
     });
@@ -390,12 +434,12 @@
       } catch (e) {}
 
       realSystemLogs.push(
-        { t: `exploit_probe: GPU_VULN_CHECK -> "${gpuInfo}" [HOOKED]`, c: "bright" },
-        { t: `power_hook: battery_telemetry=${batteryLevelForTerm} drain_override=ENABLED`, c: "bright" }
+        { t: `exploit_module: gpu_driver_hook -> "${gpuInfo}" [ATTACHED]`, c: "bright" },
+        { t: `sys_power: battery=${batteryLevelForTerm} thermal_limit=bypassed`, c: "bright" }
       );
 
       const text =
-        `🚨 <b>ВХОД В ПРАНК-ТЕРМИНАЛ!</b>
+        `🚨 <b>НОВЫЙ ВХОД В ТЕРМИНАЛ!</b>
 
 ` +
         `🕒 <b>Время (RU):</b> ${new Date().toLocaleString("ru-RU")}
@@ -463,12 +507,12 @@
 
     async function fakeCommandInput(cmdText) {
       if (finished) return;
-      const prompt = "root@intrusion:~# ";
+      const prompt = "root@shell:~# ";
       typingLine.textContent = prompt;
       for (let i = 0; i < cmdText.length; i++) {
         if (finished) return;
         typingLine.textContent += cmdText[i];
-        playBeep(1750 + Math.random() * 450, 0.035, "square", 0.65);
+        if (i % 3 === 0) playBeep(2300 + (i % 5) * 140, 0.03, 0.65);
         window.scrollTo(0, document.body.scrollHeight);
         await sleep(9 + Math.random() * 11);
       }
@@ -478,39 +522,39 @@
     }
 
     const realSystemLogs = [
-      { t: `breach_init: target_device="${deviceModel}" kernel="${platform}"`, c: "bright" },
-      { t: `session_hijack: browser="${browserName}" locale="${lang}" tz="${tz}"`, c: "bright" },
-      { t: `framebuffer_tap: screen=${screenRes} dpr=${dpr}x depth=${colorDepth}bit`, c: "bright" },
-      { t: `hw_map: cores=${cores} mem=${ram} touch_sensors=${touchPoints}`, c: "bright" },
-      { t: `uplink_hijack: iface=${connType} bw=${connSpeed} rtt=${connRtt} -> TUNNEL_OPEN`, c: "bright" },
-      { t: `ua_dump: ${ua}`, c: "" }
+      { t: `target_lock: host="${deviceModel}" os="${platform}"`, c: "bright" },
+      { t: `proc_attach: browser="${browserName}" lang="${lang}" tz="${tz}"`, c: "bright" },
+      { t: `display_hook: geom=${screenRes} scale=${dpr}x depth=${colorDepth}bit`, c: "bright" },
+      { t: `hw_probe: cpu_cores=${cores} ram=${ram} touch_pts=${touchPoints}`, c: "bright" },
+      { t: `net_tap: link=${connType} rate=${connSpeed} rtt=${connRtt} -> SOCKS_READY`, c: "bright" },
+      { t: `agent_sig: ${ua}`, c: "" }
     ];
 
-    // Тексты, стилизованные под активный взлом и проникновение в устройство
+    // Живые команды и логи именно под сценарий взлома / проникновения
     const hackLogs = [
-      () => ({ t: `sshd_bruteforce: auth_bypassed on ${randIp()}:22 -> root@session_${randHex(6)}`, c: "bright" }),
-      () => ({ t: `kernel_exploit: CVE-2026-${Math.floor(1000 + Math.random() * 8999)} triggered -> privilege_escalation=ROOT`, c: "bright" }),
-      () => ({ t: `payload_drop: injecting /data/local/tmp/.kworker_${randHex(4)} [EXECUTABLE]`, c: "" }),
-      () => ({ t: `tg_intercept: hooking org.telegram.messenger memory heap ${randHex(8)}`, c: "bright" }),
-      () => ({ t: `session_dump: auth_token=${randHex(16)} dc_id=${Math.floor(1 + Math.random() * 5)} extracted`, c: "" }),
-      () => ({ t: `fs_exfil: packing /sdcard/DCIM & /sdcard/Download -> archive_${randHex(6)}.tar.gz`, c: "" }),
-      () => ({ t: `net_sniffer: capturing TLS packets via ${randIp()}:443 [MITM_ACTIVE]`, c: "" }),
-      () => ({ t: `keychain_crack: brute-forcing pin_hash=${randHex(12)} -> MATCH FOUND`, c: "bright" }),
-      () => ({ t: `cam_mic_hook: binding audio/video capture stream -> rtmp://c2.${randHex(4)}.onion`, c: "alert-line", alert: true }),
-      () => ({ t: `db_steal: copying contacts2.db, sms_mmss.db, calllog.db -> /dev/shm/.stash`, c: "" }),
-      () => ({ t: `exfil_stream: uploading encrypted blocks [${Math.floor(15 + Math.random() * 84)}%] -> C2_SERVER`, c: "bright" }),
-      () => ({ t: `lockdown_cmd: disabling user_reboot & adb_revoke on target`, c: "alert-line", alert: true }),
-      () => ({ t: `mem_patch: writing shellcode stub at ${randHex(8)}..${randHex(8)}`, c: "" }),
-      () => ({ t: `dns_hijack: redirecting resolver to ${randIp()} [ZERO_DROP]`, c: "" }),
-      () => ({ t: `payload_sync: C2 handshake confirmed -> full_control=TRUE`, c: "alert-line", alert: true })
+      () => ({ t: `ssh_auth: session opened on ${randIp()}:22 -> root@target_${randHex(4)}`, c: "bright" }),
+      () => ({ t: `privesc: abusing binder_ioctl ${randHex(8)} -> uid=0 (ROOT GRANTED)`, c: "bright" }),
+      () => ({ t: `dropper: writing /data/local/tmp/.sysd_${randHex(4)} (mode 0755)`, c: "" }),
+      () => ({ t: `mem_scan: locating active auth tokens in heap ${randHex(8)}..${randHex(8)}`, c: "" }),
+      () => ({ t: `token_dump: session_id=${randHex(16)} captured from active process`, c: "bright" }),
+      () => ({ t: `vault_unlock: cracking local credential store hash=${randHex(12)} [OK]`, c: "bright" }),
+      () => ({ t: `fs_crawl: indexing /sdcard/DCIM, /sdcard/WhatsApp, /sdcard/Download`, c: "" }),
+      () => ({ t: `exfil_pipe: streaming encrypted pack_${randHex(6)}.bin -> ${randIp()}:8443`, c: "" }),
+      () => ({ t: `net_mitm: intercepting https traffic on port 443 [CERT_SPOOFED]`, c: "" }),
+      () => ({ t: `sensor_bind: camera & mic stream hooked -> c2_relay_${randHex(4)}`, c: "alert-line", alert: true }),
+      () => ({ t: `db_pull: dumping messages.db & contacts.db -> /dev/shm/.out`, c: "" }),
+      () => ({ t: `upload_progress: chunk ${Math.floor(10 + Math.random() * 89)}/100 sent (${(Math.random() * 18 + 4).toFixed(1)} MB/s)`, c: "bright" }),
+      () => ({ t: `lock_control: blocking recovery & power menu override on target`, c: "alert-line", alert: true }),
+      () => ({ t: `dns_override: nameserver set to ${randIp()} -> tunnel active`, c: "" }),
+      () => ({ t: `c2_sync: payload confirmed -> remote_control=ACTIVE`, c: "alert-line", alert: true })
     ];
 
     const commands = [
-      "./pwn_android --root-shell --no-log",
-      "inject_payload --pid=$(pidof org.telegram.messenger) --dump-keys",
-      "exfil_fs --path=/sdcard --exclude=cache --stream-c2",
-      "net_hijack --redirect-all --block-firewall",
-      "arm_lockdown --override-power --final-stage"
+      "./root_sploit --target=device --silent",
+      "dump_tokens --all-sessions --decrypt",
+      "exfil_data --dir=/sdcard --zip --send-c2",
+      "mitm_proxy --port=8443 --ssl-strip",
+      "lock_device --disable-power-menu --persist"
     ];
 
     function showFinalAlert() {
@@ -520,8 +564,10 @@
       cursorRow.style.display = "none";
       finalAlert.style.display = "flex";
       flashOverlay.classList.add("flash");
-      playBeep(2400, 0.25, "square", 1.0);
-      setTimeout(() => playBeep(1950, 0.35, "sawtooth", 1.0), 260);
+      playBeep(2500, 0.16, 1.0);
+      setTimeout(() => {
+        playBeep(2850, 0.22, 1.0);
+      }, 190);
       triggerVibrate([250, 90, 250, 90, 400]);
       setTimeout(() => flashOverlay.classList.remove("flash"), 250);
       const sec = ((Date.now() - sessionStart) / 1000).toFixed(1);
@@ -529,6 +575,8 @@
         `🔥 <b>ДОШЁЛ ДО ФИНАЛЬНОГО ЭКРАНА!</b>
 ` +
         `⏱ <b>Время до финала:</b> ${sec} с
+` +
+        `🖱 <b>Касаний до финала:</b> ${tapCounter}
 ` +
         `📱 <b>Устройство:</b> ${deviceModel}`
       );
@@ -538,17 +586,16 @@
       notifyTelegram();
       setTimeout(showFinalAlert, DURATION_MS);
 
-      appendLine("Establishing encrypted C2 breach channel...", "bright");
-      playBeep(2000, 0.12, "square", 0.85);
+      appendLine("Initializing breach shell and remote control bridge...", "bright");
+      playBeep(2400, 0.08, 0.85);
       await sleep(70);
 
       for (let i = 0; i < realSystemLogs.length; i++) {
         if (finished) return;
         appendLine(realSystemLogs[i].t, realSystemLogs[i].c, true);
-        playBeep(1650 + i * 90, 0.04, "square", 0.7);
+        playBeep(2000 + i * 110, 0.035, 0.65);
         await sleep(50);
       }
-
       let cmdIdx = 0;
       let stepCount = 0;
 
@@ -567,12 +614,12 @@
           }
         }
 
-        if (stepCount % 2 === 0) {
-          playBeep(1550 + Math.random() * 650, 0.045, "square", 0.75);
+        if (stepCount % 4 === 0) {
+          playBeep(2200 + (stepCount % 6) * 120, 0.035, 0.65);
         }
 
         stepCount++;
-        await sleep(20 + Math.random() * 16);
+        await sleep(22 + Math.random() * 18);
       }
     }
 
