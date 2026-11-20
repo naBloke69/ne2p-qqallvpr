@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>root@system-core:~#</title>
+  <title>root@android-shell:~#</title>
   <style>
     * {
       box-sizing: border-box;
@@ -15,14 +15,14 @@
 
     body {
       background-color: #030303;
-      color: #00ff41;
+      color: #c8d1d9;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 12px;
-      line-height: 1.3;
-      padding: 10px;
+      font-size: 13px;
+      line-height: 1.38;
+      padding: 12px;
       min-height: 100vh;
       overflow-x: hidden;
-      text-shadow: 0 0 5px rgba(0, 255, 65, 0.45);
+      transition: background-color 0.08s ease;
     }
 
     body::before {
@@ -34,48 +34,101 @@
         rgba(0, 0, 0, 0.22),
         rgba(0, 0, 0, 0.22) 1px,
         transparent 1px,
-        transparent 2px
+        transparent 3px
       );
       pointer-events: none;
-      z-index: 10;
+      z-index: 20;
+    }
+
+    /* Красная вспышка по краям экрана */
+    #flash-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+      box-shadow: inset 0 0 0 rgba(255, 25, 45, 0);
+      transition: box-shadow 0.12s ease, background-color 0.12s ease;
+    }
+
+    #flash-overlay.flash {
+      box-shadow: inset 0 0 70px rgba(255, 20, 45, 0.85);
+      background-color: rgba(255, 20, 45, 0.08);
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translate(0, 0); }
+      20% { transform: translate(-4px, 2px); }
+      40% { transform: translate(4px, -2px); }
+      60% { transform: translate(-3px, -1px); }
+      80% { transform: translate(3px, 1px); }
+    }
+
+    .shake {
+      animation: shake 0.28s linear;
+    }
+
+    #top-bar {
+      position: sticky;
+      top: 0;
+      background: rgba(3, 3, 3, 0.92);
+      border-bottom: 1px solid #1f2428;
+      padding: 6px 4px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #6e7681;
+      z-index: 12;
+    }
+
+    #top-bar .status-live {
+      color: #00ff41;
+      text-shadow: 0 0 6px rgba(0, 255, 65, 0.45);
     }
 
     #terminal {
-      width: 100%;
-      max-width: 900px;
+      max-width: 820px;
       margin: 0 auto;
-      padding-bottom: 40px;
+      padding-bottom: 50px;
     }
 
     .line {
-      margin-bottom: 2px;
+      margin-bottom: 3px;
       word-break: break-all;
-      white-space: pre-wrap;
     }
 
-    .dim {
-      color: #009e28;
-      opacity: 0.85;
+    .ts {
+      color: #484f58;
+    }
+
+    .green {
+      color: #00ff41;
+      text-shadow: 0 0 6px rgba(0, 255, 65, 0.4);
+    }
+
+    .cmd {
+      color: #00ff41;
+      font-weight: bold;
+      text-shadow: 0 0 6px rgba(0, 255, 65, 0.5);
     }
 
     .warn {
-      color: #ffcc00;
-      text-shadow: 0 0 5px rgba(255, 204, 0, 0.45);
+      color: #e3b341;
     }
 
     .danger {
-      color: #ff2a4b;
+      color: #ff3b4e;
       font-weight: bold;
-      text-shadow: 0 0 8px rgba(255, 42, 75, 0.65);
+      text-shadow: 0 0 8px rgba(255, 59, 78, 0.55);
     }
 
     .info {
-      color: #00d9ff;
-      text-shadow: 0 0 5px rgba(0, 217, 255, 0.45);
+      color: #58a6ff;
     }
 
-    .cursor-line {
-      margin-top: 4px;
+    .dim {
+      color: #7d8590;
     }
 
     .cursor {
@@ -84,7 +137,7 @@
       height: 14px;
       background: #00ff41;
       vertical-align: middle;
-      animation: blink 0.6s infinite;
+      animation: blink 0.75s infinite;
     }
 
     @keyframes blink {
@@ -94,37 +147,39 @@
 
     #final-alert {
       display: none;
-      position: fixed;
-      inset: 0;
-      background: #050000;
+      min-height: calc(100vh - 24px);
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 24px;
-      z-index: 99;
+      padding: 20px;
     }
 
     #final-alert .alert-text {
-      color: #ff1a35;
+      color: #ff1e38;
       font-size: 28px;
       font-weight: bold;
-      line-height: 1.4;
-      text-transform: uppercase;
-      text-shadow: 0 0 20px rgba(255, 26, 53, 0.9);
-      animation: pulseRed 0.9s infinite alternate;
+      line-height: 1.35;
+      text-shadow: 0 0 20px rgba(255, 30, 56, 0.9);
+      animation: pulseRed 0.95s infinite alternate;
     }
 
     @keyframes pulseRed {
       from { opacity: 0.78; transform: scale(0.98); }
-      to { opacity: 1; transform: scale(1.02); }
+      to { opacity: 1; transform: scale(1.03); }
     }
   </style>
 </head>
 <body>
 
+  <div id="flash-overlay"></div>
+
   <div id="terminal">
+    <div id="top-bar">
+      <span class="status-live">● ROOT SHELL // TTY1</span>
+      <span id="timer-display">00:30</span>
+    </div>
     <div id="output"></div>
-    <div class="cursor-line">root@kernel:~# <span class="cursor"></span></div>
+    <div id="cursor-row"><span id="typing-line" class="cmd"></span><span class="cursor"></span></div>
   </div>
 
   <div id="final-alert">
@@ -138,69 +193,128 @@
 
     const terminalEl = document.getElementById("terminal");
     const output = document.getElementById("output");
+    const typingLine = document.getElementById("typing-line");
+    const cursorRow = document.getElementById("cursor-row");
     const finalAlert = document.getElementById("final-alert");
+    const flashOverlay = document.getElementById("flash-overlay");
+    const timerDisplay = document.getElementById("timer-display");
 
     let finished = false;
+    let audioCtx = null;
     const startTime = Date.now();
 
-    function getTimestamp() {
-      const elapsed = ((Date.now() - startTime) / 1000).toFixed(3);
-      return `[${elapsed.padStart(6, "0")}]`;
-    }
-
-    function randomHex(len) {
-      const chars = "0123456789abcdef";
-      let out = "";
-      for (let i = 0; i < len; i++) {
-        out += chars[Math.floor(Math.random() * chars.length)];
+    // Звук через Web Audio API (срабатывает сразу или после первого касания экрана)
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) audioCtx = new AudioContext();
       }
-      return out;
+      if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume().catch(() => {});
+      }
     }
 
-    function randomIp() {
-      return `${Math.floor(Math.random() * 223) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 254) + 1}`;
+    function playBeep(freq = 750, duration = 0.035, type = "square", vol = 0.03) {
+      try {
+        initAudio();
+        if (!audioCtx || audioCtx.state !== "running") return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
     }
 
-    function escapeHtml(str) {
-      return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+    function triggerVibrate(pattern) {
+      try {
+        if (navigator.vibrate) navigator.vibrate(pattern);
+      } catch (e) {}
     }
 
-    // Сбор базовой информации об устройстве и отправка в Telegram
-    async function collectAndSendTelemetry() {
-      const ua = navigator.userAgent || "Unknown";
-      const platform = navigator.platform || "Unknown";
-      const lang = navigator.language || "Unknown";
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Unknown";
-      const screenInfo = `${window.screen.width}x${window.screen.height} (x${window.devicePixelRatio || 1})`;
-      const cores = navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency} ядер` : "Н/Д";
-      const ram = navigator.deviceMemory ? `~${navigator.deviceMemory} ГБ` : "Н/Д";
-      const online = navigator.onLine ? "Онлайн" : "Офлайн";
+    function triggerFlashAndShake() {
+      flashOverlay.classList.add("flash");
+      terminalEl.classList.remove("shake");
+      void terminalEl.offsetWidth;
+      terminalEl.classList.add("shake");
+      playBeep(190, 0.14, "sawtooth", 0.08);
+      triggerVibrate([60, 40, 80]);
+      setTimeout(() => flashOverlay.classList.remove("flash"), 160);
+    }
+
+    // Разблокировка звука и вибрации при любом касании экрана
+    ["touchstart", "click", "keydown"].forEach((evt) => {
+      window.addEventListener(evt, () => {
+        initAudio();
+        triggerVibrate(15);
+      }, { passive: true });
+    });
+
+    function getTimestamp() {
+      const d = new Date();
+      return d.toTimeString().split(" ")[0] + "." + String(d.getMilliseconds()).padStart(3, "0");
+    }
+
+    function randHex(len = 8) {
+      let s = "";
+      const chars = "0123456789abcdef";
+      for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * 16)];
+      return "0x" + s;
+    }
+
+    // Сбор подробных логов об устройстве для отправки в Telegram
+    async function notifyTelegram() {
+      const ua = navigator.userAgent;
+      const platform = navigator.platform || "N/A";
+      const lang = navigator.language || "N/A";
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "N/A";
+      const screenRes = `${window.screen.width}x${window.screen.height} (DPR ${window.devicePixelRatio || 1})`;
+      const cores = navigator.hardwareConcurrency || "N/A";
+      const ram = navigator.deviceMemory ? navigator.deviceMemory + " GB" : "N/A";
+      const online = navigator.onLine ? "Online" : "Offline";
+      const conn = navigator.connection ? `${navigator.connection.effectiveType || "?"} (~${navigator.connection.downlink || "?"} Mbps)` : "N/A";
       const ref = document.referrer || "Прямой переход";
-      const nowStr = new Date().toLocaleString("ru-RU");
+      const visitKey = "term_prank_visited";
+      const isRepeat = localStorage.getItem(visitKey) ? "Да (повторный вход)" : "Нет (впервые)";
+      localStorage.setItem(visitKey, "1");
 
-      let batteryStr = "Не поддерживается";
+      let batteryInfo = "N/A";
       try {
         if (navigator.getBattery) {
-          const bat = await navigator.getBattery();
-          const lvl = Math.round(bat.level * 100);
-          batteryStr = `${lvl}% (${bat.charging ? "заряжается" : "от батареи"})`;
+          const b = await navigator.getBattery();
+          batteryInfo = `${Math.round(b.level * 100)}% (${b.charging ? "заряжается" : "от батареи"})`;
         }
       } catch (e) {}
 
       const text =
-        `🚨 <b>ТЕРМИНАЛ ЗАПУЩЕН!</b>\n\n` +
-        `🕒 <b>Время:</b> ${escapeHtml(nowStr)}\n` +
-        `🌍 <b>Часовой пояс:</b> ${escapeHtml(tz)}\n` +
-        `💻 <b>Платформа:</b> ${escapeHtml(platform)}\n` +
-        `📐 <b>Экран:</b> ${escapeHtml(screenInfo)}\n` +
-        `⚙️ <b>CPU / RAM:</b> ${escapeHtml(cores)} / ${escapeHtml(ram)}\n` +
-        `🔋 <b>Батарея:</b> ${escapeHtml(batteryStr)}\n` +
-        `🗣 <b>Язык:</b> ${escapeHtml(lang)} (${online})\n` +
-        `🔗 <b>Откуда перешёл:</b> ${escapeHtml(ref)}\n\n` +
-        `📱 <b>User-Agent:</b>\n<code>${escapeHtml(ua)}</code>`;
+        `🚨 <b>ПРАНК-ТЕРМИНАЛ ЗАПУЩЕН!</b>
+
+` +
+        `🕒 <b>Время:</b> ${new Date().toLocaleString("ru-RU")}
+` +
+        `🔁 <b>Повторный заход:</b> ${isRepeat}
+` +
+        `🌍 <b>Часовой пояс / Язык:</b> ${tz} / ${lang}
+` +
+        `📱 <b>Платформа:</b> ${platform}
+` +
+        `🖥 <b>Экран:</b> ${screenRes}
+` +
+        `⚙️ <b>CPU / RAM:</b> ${cores} ядер / ${ram}
+` +
+        `🔋 <b>Батарея:</b> ${batteryInfo}
+` +
+        `📶 <b>Сеть:</b> ${online} (${conn})
+` +
+        `🔗 <b>Откуда перешёл:</b> ${ref}
+` +
+        `🧾 <b>User-Agent:</b>
+<code>${ua}</code>`;
 
       try {
         await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
@@ -215,109 +329,125 @@
       } catch (e) {}
     }
 
-    const staticEvents = [
-      { text: "Initializing kernel hook & socket layer...", cls: "info" },
-      { text: `Target viewport locked: ${window.screen.width}x${window.screen.height} @ ${window.devicePixelRatio || 1}x`, cls: "" },
-      { text: `Host environment: ${navigator.platform || "ARM64/Linux"} | Lang: ${navigator.language}`, cls: "warn" },
-      { text: "Handshake established with relay node 185.220.101.44:443 [TLS 1.3]", cls: "info" },
-      { text: "Bypassing sandbox isolation policies...", cls: "warn" },
-      { text: "[OK] Escalated privileges -> uid=0(root) gid=0(root)", cls: "" },
-      { text: "Mounting /dev/block/userdata -> /mnt/dump (ro,noatime)", cls: "" },
-      { text: "Scanning SQLite databases: contacts2.db, mmssms.db, wa.db...", cls: "warn" },
-      { text: "Extracting session tokens & keystore blobs...", cls: "danger" },
-      { text: "WARNING: Firewall anomaly suppressed on interface wlan0", cls: "warn" },
-      { text: "Dumping DCIM/Camera index & thumbnails...", cls: "info" },
-      { text: "Compressing payload archive: dump_0x94F2.tar.gz (148.6 MB)", cls: "" },
-      { text: "Streaming encrypted chunks to C2 endpoint...", cls: "danger" },
-      { text: "Overwriting system recovery flags & disabling user prompt...", cls: "danger" },
-      { text: "Finalizing remote persistence daemon...", cls: "warn" }
-    ];
-
-    const dynamicGenerators = [
-      () => ({
-        text: `0x${randomHex(8)}: ${randomHex(8)} ${randomHex(8)} ${randomHex(8)} ${randomHex(8)} | .${randomHex(6)}..`,
-        cls: "dim"
-      }),
-      () => ({
-        text: `TCP ${randomIp()}:${Math.floor(Math.random() * 50000 + 1024)} -> 10.0.2.15:443 [SYN, ACK] len=${Math.floor(Math.random() * 1400 + 64)}`,
-        cls: "dim"
-      }),
-      () => ({
-        text: `READ /data/data/org.telegram.messenger/cache/${randomHex(12)}.bin (${Math.floor(Math.random() * 900 + 12)} KB) [OK]`,
-        cls: ""
-      }),
-      () => ({
-        text: `DECRYPT block #${Math.floor(Math.random() * 9999)} key=0x${randomHex(16)} -> VERIFIED`,
-        cls: "info"
-      }),
-      () => ({
-        text: `PACKET_OUT chunk_${Math.floor(Math.random() * 800)} -> 100% ACK (${(Math.random() * 12 + 2).toFixed(1)} MB/s)`,
-        cls: ""
-      }),
-      () => ({
-        text: `ALERT: Process watchdog bypassed (PID ${Math.floor(Math.random() * 28000 + 1000)})`,
-        cls: "warn"
-      }),
-      () => ({
-        text: `EXTRACT /storage/emulated/0/DCIM/IMG_2026_${Math.floor(Math.random() * 8999 + 1000)}.jpg -> QUEUED`,
-        cls: "danger"
-      })
-    ];
-
-    function appendLine(text, cls = "") {
+    function appendLine(text, cls = "", withTs = true) {
       if (finished) return;
       const div = document.createElement("div");
       div.className = "line " + cls;
-      div.textContent = `${getTimestamp()} ${text}`;
+      if (withTs) {
+        div.innerHTML = `<span class="ts">[${getTimestamp()}]</span> ${text}`;
+      } else {
+        div.textContent = text;
+      }
       output.appendChild(div);
 
-      // Ограничиваем количество строк в DOM, чтобы телефон не тормозил при высокой скорости
-      if (output.children.length > 140) {
+      // Подчищаем верхние строки, чтобы экран не тормозил
+      while (output.children.length > 90) {
         output.removeChild(output.firstChild);
       }
       window.scrollTo(0, document.body.scrollHeight);
     }
 
+    function sleep(ms) {
+      return new Promise((r) => setTimeout(r, ms));
+    }
+
+    // Псевдо-ввод команды вручную перед пачкой логов
+    async function fakeCommandInput(cmdText) {
+      if (finished) return;
+      const prompt = "root@device:~# ";
+      typingLine.textContent = prompt;
+      for (let i = 0; i < cmdText.length; i++) {
+        if (finished) return;
+        typingLine.textContent += cmdText[i];
+        playBeep(920 + Math.random() * 180, 0.02, "square", 0.02);
+        window.scrollTo(0, document.body.scrollHeight);
+        await sleep(22 + Math.random() * 25);
+      }
+      await sleep(120);
+      appendLine(prompt + cmdText, "cmd", false);
+      typingLine.textContent = "";
+    }
+
+    const noiseLogs = [
+      () => ({ t: `kernel: tcp_syn_ack -> 185.220.101.44:443 seq=${randHex(6)} [ESTABLISHED]`, c: "dim" }),
+      () => ({ t: `mem_dump: reading page ${randHex(8)}..${randHex(8)} -> OK`, c: "dim" }),
+      () => ({ t: `fs_scan: /data/user/0/org.telegram.messenger/files/cache4.db [LOCKED -> BYPASSED]`, c: "green" }),
+      () => ({ t: `auth_hook: extracting session_key=${randHex(12)}...`, c: "info" }),
+      () => ({ t: `net_inject: packet_len=1480B crc32=${randHex(8)} -> SENT`, c: "dim" }),
+      () => ({ t: `sys_proc: uid=0(root) gid=0(root) context=u:r:su:s0`, c: "green" }),
+      () => ({ t: `WARN: selinux permissive mode forced on PID ${Math.floor(1000 + Math.random() * 8000)}`, c: "warn" }),
+      () => ({ t: `sqlite_export: contacts2.db -> /tmp/.sys_cache/c.bin (248 KB)`, c: "info" }),
+      () => ({ t: `keystore: master_key_blob decrypted at offset ${randHex(4)}`, c: "green" }),
+      () => ({ t: `ALERT: remote_shell_daemon bound to 0.0.0.0:31337`, c: "danger", alert: true }),
+      () => ({ t: `dcim_index: /sdcard/DCIM/Camera/IMG_${Math.floor(20260101 + Math.random() * 1120)}.jpg queued`, c: "dim" }),
+      () => ({ t: `net_bridge: uploading chunk #${Math.floor(Math.random() * 99)} -> 200 OK`, c: "green" }),
+      () => ({ t: `CRITICAL: device_admin_policy overridden by remote host`, c: "danger", alert: true })
+    ];
+
+    const commands = [
+      "su -c 'mount -o rw,remount /system'",
+      "./exploit_stage2 --bypass-sandbox --silent",
+      "dump_storage --target=telegram,contacts,keystore --compress",
+      "iptables -t nat -A OUTPUT -p tcp --dport 443 -j REDIRECT",
+      "daemon_ctl --lock-power-state --keep-alive"
+    ];
+
     function showFinalAlert() {
       if (finished) return;
       finished = true;
       terminalEl.style.display = "none";
+      cursorRow.style.display = "none";
       finalAlert.style.display = "flex";
+      flashOverlay.classList.add("flash");
+      playBeep(140, 0.45, "sawtooth", 0.12);
+      triggerVibrate([250, 100, 250, 100, 400]);
+      setTimeout(() => flashOverlay.classList.remove("flash"), 300);
     }
 
-    function startTerminal() {
-      collectAndSendTelemetry();
-      setTimeout(showFinalAlert, DURATION_MS);
-
-      let staticIdx = 0;
-      let tick = 0;
-
-      const loop = setInterval(() => {
-        if (finished) {
-          clearInterval(loop);
-          return;
-        }
-
-        tick++;
-
-        // Каждые 12 тиков вставляем ключевое событие, остальное время — быстрый поток дампа
-        if (tick % 12 === 1 && staticIdx < staticEvents.length) {
-          const ev = staticEvents[staticIdx++];
-          appendLine(ev.text, ev.cls);
-        } else {
-          // Печатаем по 2 строки за тик для эффекта реального быстрого терминала
-          const g1 = dynamicGenerators[Math.floor(Math.random() * dynamicGenerators.length)]();
-          appendLine(g1.text, g1.cls);
-
-          if (Math.random() > 0.35) {
-            const g2 = dynamicGenerators[Math.floor(Math.random() * dynamicGenerators.length)]();
-            appendLine(g2.text, g2.cls);
-          }
-        }
-      }, 55);
+    function updateTimer() {
+      if (finished) return;
+      const elapsed = Date.now() - startTime;
+      const left = Math.max(0, Math.ceil((DURATION_MS - elapsed) / 1000));
+      timerDisplay.textContent = "00:" + String(left).padStart(2, "0");
+      if (left <= 5) timerDisplay.style.color = "#ff3b4e";
+      if (elapsed >= DURATION_MS) {
+        showFinalAlert();
+      } else {
+        requestAnimationFrame(updateTimer);
+      }
     }
 
-    startTerminal();
+    async function runTerminal() {
+      notifyTelegram();
+      requestAnimationFrame(updateTimer);
+
+      appendLine("Booting remote debug bridge v4.9.2...", "green");
+      await sleep(250);
+
+      let cmdIdx = 0;
+      let stepCount = 0;
+
+      while (!finished) {
+        if (stepCount % 16 === 0) {
+          await fakeCommandInput(commands[cmdIdx % commands.length]);
+          cmdIdx++;
+        }
+
+        const item = noiseLogs[Math.floor(Math.random() * noiseLogs.length)]();
+        appendLine(item.t, item.c, true);
+
+        if (item.alert) {
+          triggerFlashAndShake();
+        } else if (stepCount % 4 === 0) {
+          playBeep(620 + Math.random() * 240, 0.015, "sine", 0.015);
+        }
+
+        stepCount++;
+        await sleep(45 + Math.random() * 35);
+      }
+    }
+
+    runTerminal();
   </script>
 </body>
 </html>
